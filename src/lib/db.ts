@@ -1,26 +1,21 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import { mkdirSync } from 'fs';
+import { createClient } from '@libsql/client';
 
-const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'data', 'lineup.db');
-mkdirSync(path.dirname(DB_PATH), { recursive: true });
+const db = createClient({
+  url: process.env.TURSO_DATABASE_URL!,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
 
-const db = new Database(DB_PATH);
-
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS teams (
+// Initialize tables (runs on first import, idempotent)
+const initPromise = db.batch([
+  `CREATE TABLE IF NOT EXISTS teams (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     age_group TEXT,
     season TEXT,
     year INTEGER,
     created_at TEXT DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS players (
+  )`,
+  `CREATE TABLE IF NOT EXISTS players (
     id TEXT PRIMARY KEY,
     team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
@@ -31,9 +26,8 @@ db.exec(`
     goalie_preference INTEGER DEFAULT 3,
     position_preference TEXT,
     created_at TEXT DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS games (
+  )`,
+  `CREATE TABLE IF NOT EXISTS games (
     id TEXT PRIMARY KEY,
     team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
     game_date TEXT NOT NULL,
@@ -46,7 +40,8 @@ db.exec(`
     attendance TEXT DEFAULT '[]',
     lineup TEXT,
     created_at TEXT DEFAULT (datetime('now'))
-  );
-`);
+  )`,
+], 'write');
 
+export { initPromise };
 export default db;

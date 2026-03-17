@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, RefreshCw, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AttendanceSection from '@/components/roster/AttendanceSection';
 import LineupDisplay from '@/components/roster/LineupDisplay';
 import PlayerStats from '@/components/roster/PlayerStats';
@@ -19,7 +18,6 @@ import type { AttendanceRecord, LineupPeriod } from '@/lib/database.types';
 export default function GameRosterPage() {
   const { gameId } = useParams<{ gameId: string }>();
   const [isGenerating, setIsGenerating] = useState(false);
-  const [activeTab, setActiveTab] = useState('lineup');
 
   const { data: game, isLoading: gameLoading } = useGame(gameId);
   const { data: team } = useTeam(game?.team_id ?? null);
@@ -71,7 +69,7 @@ export default function GameRosterPage() {
           </Link>
         </div>
 
-        <div className="mb-8">
+        <div className="mb-8 print:hidden">
           <h1 className="text-3xl font-bold text-gray-900">{team?.name} - Game Day Lineup</h1>
           <p className="text-gray-600 mt-1">
             {format(new Date(game.game_date + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}
@@ -79,12 +77,23 @@ export default function GameRosterPage() {
           </p>
         </div>
 
+        {/* Print-only header */}
+        <div className="hidden print:block mb-4">
+          <h1 className="text-2xl font-bold text-center">{team?.name}</h1>
+          <p className="text-center text-sm text-gray-700">
+            {format(new Date(game.game_date + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}
+            {game.opponent && ` vs ${game.opponent}`}
+          </p>
+        </div>
+
         <div className="space-y-6">
-          <AttendanceSection
-            players={players}
-            attendance={attendance}
-            onUpdateAttendance={(att) => updateAttendance.mutate(att)}
-          />
+          <div className="print:hidden">
+            <AttendanceSection
+              players={players}
+              attendance={attendance}
+              onUpdateAttendance={(att) => updateAttendance.mutate(att)}
+            />
+          </div>
 
           <div className="bg-white rounded-xl p-6 print:hidden">
             <div className="flex gap-3 justify-end">
@@ -106,26 +115,22 @@ export default function GameRosterPage() {
           </div>
 
           {lineup && (
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 max-w-md print:hidden">
-                <TabsTrigger value="lineup">Lineup by Period</TabsTrigger>
-                <TabsTrigger value="stats">Playing Time Summary</TabsTrigger>
-              </TabsList>
-              <TabsContent value="lineup" className="mt-6">
+            <div className="space-y-6">
+              <div id="print-lineup">
                 <LineupDisplay
                   lineup={lineup}
                   players={players}
                   onUpdateLineup={(l) => updateLineup.mutate(l as unknown as LineupPeriod[])}
                 />
-              </TabsContent>
-              <TabsContent value="stats" className="mt-6">
+              </div>
+              <div className="print:hidden">
                 <PlayerStats
                   lineup={lineup}
                   players={players}
                   countGoalieTime={game.count_goalie_as_playing_time ?? true}
                 />
-              </TabsContent>
-            </Tabs>
+              </div>
+            </div>
           )}
         </div>
       </div>

@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import db from '@/lib/db';
+import db, { initPromise } from '@/lib/db';
 
-export function GET() {
-  const teams = db.prepare('SELECT * FROM teams ORDER BY created_at DESC').all();
-  return NextResponse.json(teams);
+export async function GET() {
+  await initPromise;
+  const result = await db.execute({ sql: 'SELECT * FROM teams ORDER BY created_at DESC', args: [] });
+  return NextResponse.json(result.rows);
 }
 
 export async function POST(request: NextRequest) {
+  await initPromise;
   const body = await request.json();
   const id = randomUUID();
-  const team = db.prepare(
-    'INSERT INTO teams (id, name, age_group, season, year) VALUES (?, ?, ?, ?, ?) RETURNING *'
-  ).get(id, body.name, body.age_group ?? null, body.season ?? null, body.year ?? null);
-  return NextResponse.json(team, { status: 201 });
+  const result = await db.execute({
+    sql: 'INSERT INTO teams (id, name, age_group, season, year) VALUES (?, ?, ?, ?, ?) RETURNING *',
+    args: [id, body.name, body.age_group ?? null, body.season ?? null, body.year ?? null],
+  });
+  return NextResponse.json(result.rows[0], { status: 201 });
 }

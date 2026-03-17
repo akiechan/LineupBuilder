@@ -30,3 +30,63 @@ body {
   color: var(--color-foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 0.4in;
+  }
+
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Fill the page */
+  #print-lineup {
+    height: calc(100vh - 3rem);
+  }
+
+  #print-lineup > div {
+    height: 100%;
+  }
+
+  /* Make the grid fill available height */
+  #print-lineup [class*="grid"] {
+    height: 100%;
+    grid-template-rows: 1fr;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  /* Cards stretch to fill */
+  #print-lineup [class*="grid"] > div {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #print-lineup [class*="grid"] > div > div {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Player list fills remaining space */
+  #print-lineup [class*="space-y-1"] {
+    flex: 1;
+  }
+
+  /* Bigger text for print readability */
+  #print-lineup h3 {
+    font-size: 1rem;
+  }
+
+  #print-lineup .text-xs {
+    font-size: 0.8rem;
+  }
+
+  #print-lineup .text-sm {
+    font-size: 0.9rem;
+  }
+}
