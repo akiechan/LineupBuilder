@@ -173,6 +173,7 @@ export default function GameRosterPage() {
             <AttendanceSection
               players={allPlayers}
               attendance={attendance}
+              numPeriods={game.num_periods || 4}
               onUpdateAttendance={handleUpdateAttendance}
             />
           </div>

@@ -304,6 +304,7 @@ describe('generateLineup', () => {
     const attendance: AttendanceRecord[] = players.map((p, i) => ({
       player_id: p.id,
       status: i < 2 ? 'late' : 'playing', // p1, p2 are late
+      ...(i < 2 ? { arrives_period: 2 } : {}), // arrive Q2
     }));
     const game = makeGame({
       has_goalie: false,
@@ -362,7 +363,7 @@ describe('generateLineup', () => {
     const players = makePlayers(8);
     const attendance: AttendanceRecord[] = [
       { player_id: 'p1', status: 'playing' },
-      { player_id: 'p2', status: 'late' },
+      { player_id: 'p2', status: 'late', arrives_period: 2 },
       { player_id: 'p3', status: 'absent' },
       { player_id: 'p4', status: 'playing' },
       { player_id: 'p5', status: 'playing' },
@@ -378,5 +379,29 @@ describe('generateLineup', () => {
 
     expect(allIds.has('p2')).toBe(true);  // late: included
     expect(allIds.has('p3')).toBe(false); // absent: excluded
+  });
+
+  it('late player arriving Q3 is excluded from Q1 and Q2', () => {
+    const players = makePlayers(10);
+    const attendance: AttendanceRecord[] = players.map((p, i) => ({
+      player_id: p.id,
+      status: i === 0 ? 'late' : 'playing',
+      ...(i === 0 ? { arrives_period: 3 } : {}),
+    }));
+    const game = makeGame({
+      has_goalie: false,
+      players_per_period: 5,
+      strategy_priorities: ['playing_time_weighted'],
+    });
+
+    for (let run = 0; run < 30; run++) {
+      const lineup = generateLineup(game, players, attendance);
+      // p1 arrives Q3 — must not be in Q1 or Q2
+      expect(lineup[0].players.map(s => s.player_id)).not.toContain('p1');
+      expect(lineup[1].players.map(s => s.player_id)).not.toContain('p1');
+      // Should play at least once overall
+      const allIds = lineup.flatMap(p => p.players.map(s => s.player_id));
+      expect(allIds).toContain('p1');
+    }
   });
 });

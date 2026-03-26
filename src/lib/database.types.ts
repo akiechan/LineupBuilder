@@ -151,6 +151,7 @@ export type GoalRecord = {
 export type AttendanceRecord = {
   player_id: string;
   status: 'playing' | 'late' | 'absent';
+  arrives_period?: number; // which period the late player arrives (e.g., 2 = Q2)
 };
 
 export type LineupPlayerSlot = {

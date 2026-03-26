@@ -10,12 +10,14 @@ export function generateLineup(
 
   // Include both 'playing' and 'late' players. Late players get reduced periods.
   const latePlayerIds = new Set<string>();
+  const lateArrivesPeriod: Record<string, number> = {}; // player_id -> period they arrive
   const playingPlayers = attendance.length === 0
     ? allPlayers
     : allPlayers.filter(p => {
         const record = attendance.find(a => a.player_id === p.id);
         if (record?.status === 'late') {
           latePlayerIds.add(p.id);
+          lateArrivesPeriod[p.id] = record.arrives_period ?? 2;
           return true;
         }
         return record?.status === 'playing';
@@ -112,8 +114,9 @@ export function generateLineup(
       ? 1 - Math.abs((p.skill_level || 2) - periodSkillTarget[period - 1]) / 2
       : 0;
     const rand = randomValues[p.id][period - 1];
-    // Late players get a penalty in early periods (they arrive late)
-    const latePenalty = latePlayerIds.has(p.id) && period <= Math.ceil(numPeriods / 3) ? -10 : 0;
+    // Late players get a penalty before their arrival period
+    const arrivesPeriod = lateArrivesPeriod[p.id] ?? numPeriods;
+    const latePenalty = latePlayerIds.has(p.id) && period < arrivesPeriod ? -10 : 0;
 
     return (
       W_skill * skill +
@@ -228,20 +231,21 @@ export function generateLineup(
     assignedCount[p.id] = goalieCount + lockedCount;
   });
 
-  // Late players get reduced minimum: max(1, effectiveMin - 1)
+  // Late players get reduced minimum based on how many periods they can play
   const getPlayerMin = (p: Player, baseMin: number) => {
-    if (latePlayerIds.has(p.id)) return Math.max(1, baseMin - 1);
+    if (latePlayerIds.has(p.id)) {
+      const arrivesPeriod = lateArrivesPeriod[p.id] ?? 2;
+      const availablePeriods = numPeriods - arrivesPeriod + 1; // periods they can play
+      return Math.max(1, Math.min(baseMin - 1, availablePeriods));
+    }
     return baseMin;
   };
 
-  // Late players cannot be assigned to the first period (they haven't arrived yet)
-  const lateBannedPeriods = new Set<number>();
-  const lateBanCount = Math.max(1, Math.ceil(numPeriods / 4)); // ban first ~25% of periods
-  for (let i = 0; i < lateBanCount; i++) lateBannedPeriods.add(i);
-
+  // Late players cannot play before their arrival period
   const isPeriodAllowed = (playerId: string, pi: number) => {
     if (!latePlayerIds.has(playerId)) return true;
-    return !lateBannedPeriods.has(pi);
+    const arrivesPeriod = lateArrivesPeriod[playerId] ?? 2; // 1-indexed period
+    return (pi + 1) >= arrivesPeriod; // pi is 0-indexed
   };
 
   // Verify feasibility
@@ -257,6 +261,10 @@ export function generateLineup(
   const playersNeedingMin = playingPlayers
     .filter(p => assignedCount[p.id] < getPlayerMin(p, effectiveMin))
     .sort((a, b) => {
+      // Late players with fewer available periods go first (most constrained)
+      const aAvail = latePlayerIds.has(a.id) ? numPeriods - (lateArrivesPeriod[a.id] ?? 2) + 1 : numPeriods;
+      const bAvail = latePlayerIds.has(b.id) ? numPeriods - (lateArrivesPeriod[b.id] ?? 2) + 1 : numPeriods;
+      if (aAvail !== bAvail) return aAvail - bAvail; // most constrained first
       const needA = getPlayerMin(a, effectiveMin) - assignedCount[a.id];
       const needB = getPlayerMin(b, effectiveMin) - assignedCount[b.id];
       if (needA !== needB) return needB - needA;
