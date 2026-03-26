@@ -230,7 +230,7 @@ export default function LineupDisplay({
 
                           {/* Goalie */}
                           {period.goalie && (
-                          <div className={`mb-3 p-2 rounded-lg ${period.goalie_locked ? 'bg-yellow-50 border border-yellow-300' : 'bg-blue-50'}`}>
+                          <div className={`mb-3 p-2 rounded-lg ${period.goalie_locked && editMode ? 'bg-yellow-50 border border-yellow-300' : 'bg-blue-50'}`}>
                             <div className="flex items-center justify-between text-xs font-medium text-blue-900 mb-0.5">
                               <div className="flex items-center gap-1.5">
                                 <Shield className="w-3.5 h-3.5" />
@@ -260,7 +260,7 @@ export default function LineupDisplay({
                                   {goalie?.name || 'Unknown'}
                                   {goalie?.jersey_number != null && ` (#${goalie.jersey_number})`}
                                 </div>
-                                {period.goalie_locked && <Lock className="w-3.5 h-3.5 text-yellow-600 shrink-0" />}
+                                {period.goalie_locked && editMode && <Lock className="w-3.5 h-3.5 text-yellow-600 shrink-0" />}
                               </div>
                             )}
                           </div>
@@ -290,7 +290,7 @@ export default function LineupDisplay({
                                             ref={provided.innerRef}
                                             {...provided.draggableProps}
                                             className={`p-1.5 rounded border text-sm ${
-                                              playerSlot.locked
+                                              playerSlot.locked && editMode
                                                 ? 'bg-yellow-50 border-yellow-300'
                                                 : snapshot.isDragging
                                                 ? 'bg-blue-50 border-blue-300 shadow-lg'
