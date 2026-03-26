@@ -52,7 +52,6 @@ describe('generateLineup', () => {
       { player_id: 'p10', status: 'playing' },
     ];
     // p8 is absent
-    const playingAttendance = attendance.filter(a => a.status === 'playing');
     const absentAttendance = attendance;
 
     const game = makeGame({ attendance: absentAttendance });
@@ -157,5 +156,72 @@ describe('generateLineup', () => {
 
     // With equal time as first priority, spread should be at most 2
     expect(max - min).toBeLessThanOrEqual(2);
+  });
+
+  it('16 players 4x4 with fair play #1 + gender #2: every player plays exactly once', () => {
+    // Simulates the Kindergarten Dolphins scenario: 16 kids, 4 periods, 4 per period, no goalie
+    // 10 boys, 6 girls — gender swap must NOT drop anyone to 0 periods
+    const players: Player[] = Array.from({ length: 16 }, (_, i) => ({
+      id: `p${i + 1}`,
+      team_id: 'team1',
+      name: `Player ${i + 1}`,
+      jersey_number: i + 1,
+      gender: i < 6 ? 'Female' : 'Male', // 6 girls, 10 boys
+      skill_level: 2 as 1 | 2 | 3,
+      attendance_pattern: 1,
+      goalie_preference: 3,
+      position_preference: 'Field',
+      created_at: '',
+    }));
+    const attendance: AttendanceRecord[] = players.map(p => ({ player_id: p.id, status: 'playing' }));
+    const game = makeGame({
+      num_periods: 4,
+      players_per_period: 4,
+      has_goalie: false,
+      strategy_priorities: ['playing_time_weighted', 'gender_weighted'],
+    });
+
+    // Run 50 times to catch probabilistic failures
+    for (let run = 0; run < 50; run++) {
+      const lineup = generateLineup(game, players, attendance);
+
+      const playCount: Record<string, number> = {};
+      players.forEach(p => { playCount[p.id] = 0; });
+      lineup.forEach(period => {
+        period.players.forEach(s => playCount[s.player_id]++);
+      });
+
+      // 16 slots / 16 players = exactly 1 each. No one should have 0.
+      const counts = Object.values(playCount);
+      expect(Math.min(...counts)).toBeGreaterThanOrEqual(1);
+      expect(Math.max(...counts)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('gender swap works freely when fair play is NOT the first priority', () => {
+    // When gender is #1 and fair play is #2, gender can freely swap
+    const players: Player[] = Array.from({ length: 16 }, (_, i) => ({
+      id: `p${i + 1}`,
+      team_id: 'team1',
+      name: `Player ${i + 1}`,
+      jersey_number: i + 1,
+      gender: i < 6 ? 'Female' : 'Male',
+      skill_level: 2 as 1 | 2 | 3,
+      attendance_pattern: 1,
+      goalie_preference: 3,
+      position_preference: 'Field',
+      created_at: '',
+    }));
+    const attendance: AttendanceRecord[] = players.map(p => ({ player_id: p.id, status: 'playing' }));
+    const game = makeGame({
+      num_periods: 4,
+      players_per_period: 4,
+      has_goalie: false,
+      strategy_priorities: ['gender_weighted', 'playing_time_weighted'],
+    });
+
+    // Should not throw — gender swaps are unrestricted
+    const lineup = generateLineup(game, players, attendance);
+    expect(lineup.length).toBe(4);
   });
 });

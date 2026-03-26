@@ -169,37 +169,42 @@ export function generateLineup(game: Game, allPlayers: Player[], currentAttendan
     let periodPlayers = sorted.slice(0, playersPerPeriod);
 
     // --- Gender balance (soft constraint) ---
-    // Spread girls evenly across periods rather than clustering
+    // Spread girls evenly across periods rather than clustering.
+    // When fair play is the TOP priority, gender swaps must not prevent any
+    // player from reaching their minimum guaranteed periods.
     if (genderEnabled) {
       const totalFemale = candidates.filter(p => p.gender === 'Female').length;
       const targetFemale = Math.round((totalFemale / candidates.length) * playersPerPeriod);
 
+      const fairPlayIsFirst = strategies[0] === 'playing_time_weighted';
+      const minPeriodsPerPlayer = Math.floor((numPeriods * playersPerPeriod) / totalAttending);
+      const isSwapSafe = (p: Player) =>
+        !fairPlayIsFirst || getEffectivePlayCount(p.id) >= minPeriodsPerPlayer;
+
       const selectedFemale = periodPlayers.filter(p => p.gender === 'Female').length;
-      const bench = sorted.slice(playersPerPeriod);
+      const benchPlayers = sorted.slice(playersPerPeriod);
 
       if (selectedFemale > targetFemale) {
-        // Too many girls selected - swap lowest-scored girls with highest-scored bench boys
         const girlsToSwap = selectedFemale - targetFemale;
-        const selectedGirls = [...periodPlayers]
-          .filter(p => p.gender === 'Female')
-          .sort((a, b) => needToPlay(a) - needToPlay(b)); // lowest scored first
-        const benchBoys = bench.filter(p => p.gender !== 'Female');
+        const swappableGirls = [...periodPlayers]
+          .filter(p => p.gender === 'Female' && isSwapSafe(p))
+          .sort((a, b) => needToPlay(a) - needToPlay(b));
+        const benchBoys = benchPlayers.filter(p => p.gender !== 'Female');
 
-        for (let i = 0; i < Math.min(girlsToSwap, benchBoys.length, selectedGirls.length); i++) {
-          const swapOut = selectedGirls[i];
+        for (let i = 0; i < Math.min(girlsToSwap, benchBoys.length, swappableGirls.length); i++) {
+          const swapOut = swappableGirls[i];
           const swapIn = benchBoys[i];
           periodPlayers = periodPlayers.map(p => p.id === swapOut.id ? swapIn : p);
         }
       } else if (selectedFemale < targetFemale) {
-        // Too few girls selected - swap lowest-scored boys with highest-scored bench girls
         const girlsNeeded = targetFemale - selectedFemale;
-        const selectedBoys = [...periodPlayers]
-          .filter(p => p.gender !== 'Female')
-          .sort((a, b) => needToPlay(a) - needToPlay(b)); // lowest scored first
-        const benchGirls = bench.filter(p => p.gender === 'Female');
+        const swappableBoys = [...periodPlayers]
+          .filter(p => p.gender !== 'Female' && isSwapSafe(p))
+          .sort((a, b) => needToPlay(a) - needToPlay(b));
+        const benchGirls = benchPlayers.filter(p => p.gender === 'Female');
 
-        for (let i = 0; i < Math.min(girlsNeeded, benchGirls.length, selectedBoys.length); i++) {
-          const swapOut = selectedBoys[i];
+        for (let i = 0; i < Math.min(girlsNeeded, benchGirls.length, swappableBoys.length); i++) {
+          const swapOut = swappableBoys[i];
           const swapIn = benchGirls[i];
           periodPlayers = periodPlayers.map(p => p.id === swapOut.id ? swapIn : p);
         }

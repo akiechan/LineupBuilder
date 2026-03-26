@@ -41,10 +41,10 @@ const initPromise = db.batch([
     lineup TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   )`,
-], 'write').then(() =>
-  // Migration: add has_goalie column if missing
-  db.execute(`ALTER TABLE games ADD COLUMN has_goalie INTEGER DEFAULT 1`).catch(() => {/* already exists */})
-);
+], 'write').then(() => Promise.all([
+  db.execute(`ALTER TABLE games ADD COLUMN has_goalie INTEGER DEFAULT 1`).catch(() => {/* already exists */}),
+  db.execute(`ALTER TABLE games ADD COLUMN guest_players TEXT DEFAULT '[]'`).catch(() => {/* already exists */}),
+]));
 
 export { initPromise };
 export default db;

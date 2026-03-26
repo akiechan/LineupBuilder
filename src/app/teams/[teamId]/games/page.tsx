@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useTeam } from '@/hooks/use-teams';
-import { useGames, useDeleteGame } from '@/hooks/use-games';
+import { useGames, useCreateGame, useDeleteGame } from '@/hooks/use-games';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowLeft, Calendar } from 'lucide-react';
 import Link from 'next/link';
@@ -18,7 +18,22 @@ export default function GamesPage() {
 
   const { data: team } = useTeam(teamId);
   const { data: games = [], isLoading } = useGames(teamId);
+  const createMutation = useCreateGame();
   const deleteMutation = useDeleteGame(teamId);
+
+  const handleCopy = (game: Game) => {
+    createMutation.mutate({
+      team_id: game.team_id,
+      game_date: game.game_date,
+      opponent: game.opponent ? `${game.opponent} (Copy)` : 'Game Day (Copy)',
+      num_periods: game.num_periods,
+      players_per_period: game.players_per_period,
+      has_goalie: game.has_goalie,
+      goalie_rotation_periods: game.goalie_rotation_periods,
+      count_goalie_as_playing_time: game.count_goalie_as_playing_time,
+      strategy_priorities: game.strategy_priorities,
+    });
+  };
 
   const handleEdit = (game: Game) => {
     setEditingGame(game);
@@ -79,7 +94,7 @@ export default function GamesPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {games.map((game) => (
-              <GameCard key={game.id} game={game} onEdit={handleEdit} onDelete={handleDelete} />
+              <GameCard key={game.id} game={game} onEdit={handleEdit} onCopy={handleCopy} onDelete={handleDelete} />
             ))}
           </div>
         )}

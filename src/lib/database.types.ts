@@ -79,6 +79,7 @@ export interface Database {
           strategy_priorities: string[];
           attendance: Json;
           lineup: Json;
+          guest_players: Json;
           created_at: string;
         };
         Insert: {
@@ -94,6 +95,7 @@ export interface Database {
           strategy_priorities?: string[];
           attendance?: Json;
           lineup?: Json;
+          guest_players?: Json;
         };
         Update: {
           id?: string;
@@ -108,6 +110,7 @@ export interface Database {
           strategy_priorities?: string[];
           attendance?: Json;
           lineup?: Json;
+          guest_players?: Json;
         };
       };
     };
@@ -117,6 +120,14 @@ export interface Database {
 export type Team = Database['public']['Tables']['teams']['Row'];
 export type Player = Database['public']['Tables']['players']['Row'];
 export type Game = Database['public']['Tables']['games']['Row'];
+
+export type GuestPlayer = {
+  id: string;
+  name: string;
+  gender: string | null;
+  skill_level: number;
+  goalie_preference: number;
+};
 
 export type AttendanceRecord = {
   player_id: string;

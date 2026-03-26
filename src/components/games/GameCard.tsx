@@ -2,7 +2,7 @@
 
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Trash2, ClipboardList, Edit } from 'lucide-react';
+import { Trash2, ClipboardList, Edit, Copy } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import type { Game } from '@/lib/database.types';
@@ -19,10 +19,12 @@ const strategyLabels: Record<string, string> = {
 export default function GameCard({
   game,
   onEdit,
+  onCopy,
   onDelete,
 }: {
   game: Game;
   onEdit: (game: Game) => void;
+  onCopy: (game: Game) => void;
   onDelete: (id: string) => void;
 }) {
   return (
@@ -40,6 +42,9 @@ export default function GameCard({
           <div className="flex gap-1">
             <Button variant="ghost" size="icon" onClick={() => onEdit(game)} className="h-8 w-8">
               <Edit className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => onCopy(game)} className="h-8 w-8 text-blue-600 hover:text-blue-700" title="Duplicate game">
+              <Copy className="w-4 h-4" />
             </Button>
             <Button variant="ghost" size="icon" onClick={() => onDelete(game.id)} className="h-8 w-8 text-red-600 hover:text-red-700">
               <Trash2 className="w-4 h-4" />

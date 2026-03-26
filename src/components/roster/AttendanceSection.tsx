@@ -87,7 +87,9 @@ export default function AttendanceSection({
                   <Icon className="w-4 h-4" />
                   <div className="text-left flex-1">
                     <div className="font-medium text-sm">{player.name}</div>
-                    {player.jersey_number && <div className="text-xs opacity-75">#{player.jersey_number}</div>}
+                    {player.id.startsWith('guest-')
+                      ? <div className="text-xs opacity-75">Guest</div>
+                      : player.jersey_number ? <div className="text-xs opacity-75">#{player.jersey_number}</div> : null}
                   </div>
                 </div>
               </button>

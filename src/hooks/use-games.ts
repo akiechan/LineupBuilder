@@ -21,7 +21,7 @@ export function useGame(gameId: string | null) {
 export function useCreateGame() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (game: Omit<Game, 'id' | 'created_at' | 'attendance' | 'lineup'>) =>
+    mutationFn: (game: Omit<Game, 'id' | 'created_at' | 'attendance' | 'lineup' | 'guest_players'>) =>
       api<Game>('/api/games', { method: 'POST', body: JSON.stringify(game) }),
     onSuccess: (data: Game) =>
       queryClient.invalidateQueries({ queryKey: ['games', data.team_id] }),
@@ -63,6 +63,15 @@ export function useUpdateGameLineup(gameId: string) {
   return useMutation({
     mutationFn: (lineup: unknown) =>
       api(`/api/games/${gameId}`, { method: 'PATCH', body: JSON.stringify({ lineup }) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['game', gameId] }),
+  });
+}
+
+export function useUpdateGameGuestPlayers(gameId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (guest_players: unknown) =>
+      api(`/api/games/${gameId}`, { method: 'PATCH', body: JSON.stringify({ guest_players }) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['game', gameId] }),
   });
 }
