@@ -41,7 +41,10 @@ const initPromise = db.batch([
     lineup TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   )`,
-], 'write');
+], 'write').then(() =>
+  // Migration: add has_goalie column if missing
+  db.execute(`ALTER TABLE games ADD COLUMN has_goalie INTEGER DEFAULT 1`).catch(() => {/* already exists */})
+);
 
 export { initPromise };
 export default db;

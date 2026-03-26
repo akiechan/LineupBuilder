@@ -9,6 +9,8 @@ import type { Game } from '@/lib/database.types';
 
 const strategyLabels: Record<string, string> = {
   skill_weighted: 'Skill',
+  skill_grouped: 'Skill Grouped',
+  skill_balanced: 'Skill Balanced',
   attendance_weighted: 'Attendance',
   gender_weighted: 'Gender',
   playing_time_weighted: 'Equal Time',

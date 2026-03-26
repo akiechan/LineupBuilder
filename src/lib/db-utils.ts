@@ -1,5 +1,5 @@
 const JSON_FIELDS = ['attendance', 'lineup', 'strategy_priorities'];
-const BOOL_FIELDS = ['count_goalie_as_playing_time'];
+const BOOL_FIELDS = ['count_goalie_as_playing_time', 'has_goalie'];
 
 export function deserializeGame(row: Record<string, unknown>): Record<string, unknown> {
   const result = { ...row };

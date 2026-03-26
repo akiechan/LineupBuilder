@@ -26,6 +26,7 @@ export default function GameDialog({
     opponent: '',
     num_periods: 4,
     players_per_period: 5,
+    has_goalie: true,
     goalie_rotation_periods: 1,
     count_goalie_as_playing_time: true,
     strategy_priorities: [] as string[],
@@ -42,6 +43,7 @@ export default function GameDialog({
         opponent: game.opponent || '',
         num_periods: game.num_periods || 4,
         players_per_period: game.players_per_period || 5,
+        has_goalie: game.has_goalie ?? true,
         goalie_rotation_periods: game.goalie_rotation_periods || 1,
         count_goalie_as_playing_time: game.count_goalie_as_playing_time ?? true,
         strategy_priorities: game.strategy_priorities || [],
@@ -53,6 +55,7 @@ export default function GameDialog({
         opponent: '',
         num_periods: 4,
         players_per_period: 5,
+        has_goalie: true,
         goalie_rotation_periods: 1,
         count_goalie_as_playing_time: true,
         strategy_priorities: [],
@@ -102,6 +105,18 @@ export default function GameDialog({
     playing_time_weighted: 'Equal Playing Time',
   };
 
+  const skillDistribution = formData.strategy_priorities.includes('skill_grouped')
+    ? 'grouped'
+    : formData.strategy_priorities.includes('skill_balanced')
+    ? 'balanced'
+    : 'none';
+
+  const setSkillDistribution = (mode: 'none' | 'balanced' | 'grouped') => {
+    const filtered = formData.strategy_priorities.filter(s => s !== 'skill_grouped' && s !== 'skill_balanced');
+    if (mode !== 'none') filtered.push(mode === 'grouped' ? 'skill_grouped' : 'skill_balanced');
+    setFormData({ ...formData, strategy_priorities: filtered });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -109,7 +124,7 @@ export default function GameDialog({
           <DialogTitle>{game ? 'Edit Game' : 'New Game'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="game_date">Game Date *</Label>
               <Input id="game_date" type="date" value={formData.game_date} onChange={(e) => setFormData({ ...formData, game_date: e.target.value })} required />
@@ -119,30 +134,42 @@ export default function GameDialog({
               <Input id="opponent" placeholder="e.g., Blue Tigers" value={formData.opponent} onChange={(e) => setFormData({ ...formData, opponent: e.target.value })} />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className={`grid gap-3 ${formData.has_goalie ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <div>
               <Label htmlFor="periods">Periods</Label>
-              <Input id="periods" type="number" min="2" max="8" value={formData.num_periods} onChange={(e) => setFormData({ ...formData, num_periods: Number(e.target.value) })} />
+              <Input id="periods" type="number" min="2" max="8" value={String(formData.num_periods)} onChange={(e) => setFormData({ ...formData, num_periods: parseInt(e.target.value) || 0 })} />
             </div>
             <div>
               <Label htmlFor="players_per_period">Players/Period</Label>
-              <Input id="players_per_period" type="number" min="3" max="15" value={formData.players_per_period} onChange={(e) => setFormData({ ...formData, players_per_period: Number(e.target.value) })} />
+              <Input id="players_per_period" type="number" min="3" max="15" value={String(formData.players_per_period)} onChange={(e) => setFormData({ ...formData, players_per_period: parseInt(e.target.value) || 0 })} />
             </div>
-            <div>
+            {formData.has_goalie && <div>
               <Label htmlFor="goalie_rotation">Goalie Rotation</Label>
-              <Input id="goalie_rotation" type="number" min="1" max="8" value={formData.goalie_rotation_periods} onChange={(e) => setFormData({ ...formData, goalie_rotation_periods: Number(e.target.value) })} />
-            </div>
+              <Input id="goalie_rotation" type="number" min="1" max="8" value={String(formData.goalie_rotation_periods)} onChange={(e) => setFormData({ ...formData, goalie_rotation_periods: parseInt(e.target.value) || 0 })} />
+            </div>}
           </div>
           <div className="flex items-center gap-2 p-3 border rounded">
             <Checkbox
-              id="count_goalie"
-              checked={formData.count_goalie_as_playing_time}
-              onCheckedChange={(checked) => setFormData({ ...formData, count_goalie_as_playing_time: checked as boolean })}
+              id="has_goalie"
+              checked={formData.has_goalie}
+              onCheckedChange={(checked) => setFormData({ ...formData, has_goalie: checked as boolean })}
             />
-            <label htmlFor="count_goalie" className="text-sm cursor-pointer">
-              Count goalie time as equal playing time
+            <label htmlFor="has_goalie" className="text-sm cursor-pointer">
+              Game has a goalie position
             </label>
           </div>
+          {formData.has_goalie && (
+            <div className="flex items-center gap-2 p-3 border rounded ml-4">
+              <Checkbox
+                id="count_goalie"
+                checked={formData.count_goalie_as_playing_time}
+                onCheckedChange={(checked) => setFormData({ ...formData, count_goalie_as_playing_time: checked as boolean })}
+              />
+              <label htmlFor="count_goalie" className="text-sm cursor-pointer">
+                Count goalie time as equal playing time
+              </label>
+            </div>
+          )}
           <div>
             <Label>Weighting Priorities (select and order)</Label>
             <div className="space-y-2 mt-2">
@@ -165,6 +192,30 @@ export default function GameDialog({
                   </div>
                 );
               })}
+            </div>
+          </div>
+          <div>
+            <Label>Skill Distribution</Label>
+            <div className="flex gap-2 mt-2">
+              {([
+                { value: 'none', label: 'Off', desc: '' },
+                { value: 'balanced', label: 'Balanced', desc: 'Mix skill levels evenly in each quarter' },
+                { value: 'grouped', label: 'Grouped', desc: 'Cluster similar skill levels together' },
+              ] as const).map(({ value, label, desc }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setSkillDistribution(value)}
+                  className={`flex-1 p-3 rounded-lg border-2 text-left transition-all ${
+                    skillDistribution === value
+                      ? 'border-green-500 bg-green-50 text-green-800'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="font-medium text-sm">{label}</div>
+                  {desc && <div className="text-xs text-gray-500 mt-0.5">{desc}</div>}
+                </button>
+              ))}
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-4">

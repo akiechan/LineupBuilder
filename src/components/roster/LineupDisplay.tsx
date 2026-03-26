@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Shield, Lock, Unlock, GripVertical } from 'lucide-react';
+import { Shield, Lock, Unlock, GripVertical, X } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import type { Player, LineupPeriod } from '@/lib/database.types';
 
@@ -151,10 +151,16 @@ export default function LineupDisplay({
     onUpdateLineup(newLineup);
   };
 
+  const removePlayer = (periodIndex: number, playerIndex: number) => {
+    const newLineup = lineup.map(p => ({ ...p, players: [...p.players] }));
+    newLineup[periodIndex].players.splice(playerIndex, 1);
+    onUpdateLineup(newLineup);
+  };
+
   // All players in the lineup (for dropdowns)
   const allLineupPlayerIds = new Set<string>();
   lineup.forEach(p => {
-    allLineupPlayerIds.add(p.goalie);
+    if (p.goalie) allLineupPlayerIds.add(p.goalie);
     p.players.forEach(s => allLineupPlayerIds.add(s.player_id));
   });
   const lineupPlayers = players.filter(p => allLineupPlayerIds.has(p.id));
@@ -211,6 +217,7 @@ export default function LineupDisplay({
                           </div>
 
                           {/* Goalie */}
+                          {period.goalie && (
                           <div className="mb-3 p-2 bg-blue-50 rounded-lg">
                             <div className="flex items-center gap-1.5 text-xs font-medium text-blue-900 mb-0.5">
                               <Shield className="w-3.5 h-3.5" />
@@ -235,6 +242,7 @@ export default function LineupDisplay({
                               </div>
                             )}
                           </div>
+                          )}
 
                           {/* Field players */}
                           <div>
@@ -308,9 +316,14 @@ export default function LineupDisplay({
                                                 <div className="text-xs text-gray-500 shrink-0">{playerSlot.position}</div>
                                               )}
                                               {editMode && (
-                                                <button onClick={() => toggleLock(periodIndex, playerIndex)} className="p-0.5 hover:bg-gray-100 rounded print:hidden shrink-0">
-                                                  {playerSlot.locked ? <Lock className="w-3.5 h-3.5 text-yellow-600" /> : <Unlock className="w-3.5 h-3.5 text-gray-400" />}
-                                                </button>
+                                                <>
+                                                  <button onClick={() => toggleLock(periodIndex, playerIndex)} className="p-0.5 hover:bg-gray-100 rounded print:hidden shrink-0">
+                                                    {playerSlot.locked ? <Lock className="w-3.5 h-3.5 text-yellow-600" /> : <Unlock className="w-3.5 h-3.5 text-gray-400" />}
+                                                  </button>
+                                                  <button onClick={() => removePlayer(periodIndex, playerIndex)} className="p-0.5 hover:bg-red-100 rounded print:hidden shrink-0" title="Remove player">
+                                                    <X className="w-3.5 h-3.5 text-red-400" />
+                                                  </button>
+                                                </>
                                               )}
                                             </div>
                                           </div>

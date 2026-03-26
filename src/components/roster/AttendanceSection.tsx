@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Users, Check, Clock, X } from 'lucide-react';
 import type { Player, AttendanceRecord } from '@/lib/database.types';
@@ -19,8 +20,19 @@ export default function AttendanceSection({
   attendance: AttendanceRecord[];
   onUpdateAttendance: (attendance: AttendanceRecord[]) => void;
 }) {
+  // Auto-initialize all players to 'playing' when attendance is empty
+  const initialized = useRef(false);
+  useEffect(() => {
+    if (!initialized.current && attendance.length === 0 && players.length > 0) {
+      initialized.current = true;
+      onUpdateAttendance(players.map(p => ({ player_id: p.id, status: 'playing' as const })));
+    }
+  }, [attendance.length, players, onUpdateAttendance]);
+
   const getPlayerStatus = (playerId: string) => {
     const record = attendance.find(a => a.player_id === playerId);
+    // Show as 'playing' if attendance hasn't been initialized yet
+    if (!record && attendance.length === 0) return 'playing';
     return record?.status || 'absent';
   };
 
@@ -30,14 +42,19 @@ export default function AttendanceSection({
     const currentIndex = statusOrder.indexOf(currentStatus);
     const newStatus = statusOrder[(currentIndex + 1) % statusOrder.length];
 
-    const newAttendance = attendance.filter(a => a.player_id !== playerId);
+    // If attendance is empty, initialize all players first
+    let baseAttendance = attendance.length === 0
+      ? players.map(p => ({ player_id: p.id, status: 'playing' as const }))
+      : attendance;
+
+    const newAttendance = baseAttendance.filter(a => a.player_id !== playerId);
     if (newStatus !== 'absent') {
       newAttendance.push({ player_id: playerId, status: newStatus });
     }
     onUpdateAttendance(newAttendance);
   };
 
-  const playingCount = attendance.filter(a => a.status === 'playing').length;
+  const playingCount = attendance.length === 0 ? players.length : attendance.filter(a => a.status === 'playing').length;
   const lateCount = attendance.filter(a => a.status === 'late').length;
 
   return (
@@ -78,7 +95,7 @@ export default function AttendanceSection({
           })}
         </div>
         <p className="text-xs text-gray-500 mt-4 text-center">
-          Click players to cycle: Absent &rarr; Playing &rarr; Late &rarr; Absent
+          Click to change: Playing &rarr; Late &rarr; Absent &rarr; Playing
         </p>
       </CardContent>
     </Card>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useGame, useUpdateGameAttendance, useUpdateGameLineup } from '@/hooks/use-games';
 import { useTeam } from '@/hooks/use-teams';
@@ -18,6 +18,7 @@ import type { AttendanceRecord, LineupPeriod } from '@/lib/database.types';
 export default function GameRosterPage() {
   const { gameId } = useParams<{ gameId: string }>();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [localAttendance, setLocalAttendance] = useState<AttendanceRecord[] | null>(null);
 
   const { data: game, isLoading: gameLoading } = useGame(gameId);
   const { data: team } = useTeam(game?.team_id ?? null);
@@ -26,11 +27,32 @@ export default function GameRosterPage() {
   const updateAttendance = useUpdateGameAttendance(gameId);
   const updateLineup = useUpdateGameLineup(gameId);
 
+  // Sync local attendance from server when game data loads
+  useEffect(() => {
+    if (game && localAttendance === null) {
+      setLocalAttendance((game.attendance || []) as AttendanceRecord[]);
+    }
+  }, [game, localAttendance]);
+
+  const attendance = localAttendance ?? (game?.attendance || []) as AttendanceRecord[];
+
+  const handleUpdateAttendance = useCallback((att: AttendanceRecord[]) => {
+    setLocalAttendance(att); // Update local state immediately
+    updateAttendance.mutate(att); // Persist to server
+  }, [updateAttendance]);
+
+  const playingPlayers = attendance.length === 0
+    ? players
+    : players.filter(p => {
+        const record = attendance.find(a => a.player_id === p.id);
+        return record?.status === 'playing';
+      });
+
   const handleGenerateLineup = () => {
     if (!game) return;
     setIsGenerating(true);
     try {
-      const lineup = generateLineup(game, players);
+      const lineup = generateLineup(game, players, attendance);
       updateLineup.mutate(lineup as unknown as LineupPeriod[]);
     } catch (error) {
       alert('Error generating lineup: ' + (error as Error).message);
@@ -49,13 +71,7 @@ export default function GameRosterPage() {
 
   if (!game) return null;
 
-  const attendance = (game.attendance || []) as AttendanceRecord[];
   const lineup = game.lineup as LineupPeriod[] | null;
-
-  const playingPlayers = players.filter(p => {
-    const record = attendance.find(a => a.player_id === p.id);
-    return record?.status === 'playing';
-  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-6">
@@ -91,7 +107,7 @@ export default function GameRosterPage() {
             <AttendanceSection
               players={players}
               attendance={attendance}
-              onUpdateAttendance={(att) => updateAttendance.mutate(att)}
+              onUpdateAttendance={handleUpdateAttendance}
             />
           </div>
 
@@ -127,6 +143,7 @@ export default function GameRosterPage() {
                 <PlayerStats
                   lineup={lineup}
                   players={players}
+                  attendance={attendance}
                   countGoalieTime={game.count_goalie_as_playing_time ?? true}
                 />
               </div>
