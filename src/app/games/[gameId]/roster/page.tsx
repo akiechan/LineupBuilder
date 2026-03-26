@@ -133,7 +133,7 @@ export default function GameRosterPage() {
   const lineup = game.lineup as LineupPeriod[] | null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-6 print:hidden">
           <Link href={`/teams/${game.team_id}/games`}>
@@ -144,9 +144,9 @@ export default function GameRosterPage() {
           </Link>
         </div>
 
-        <div className="mb-8 print:hidden">
-          <h1 className="text-3xl font-bold text-gray-900">{team?.name} - Game Day Lineup</h1>
-          <p className="text-gray-600 mt-1">
+        <div className="mb-6 print:hidden">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{team?.name} - Game Day</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">
             {format(new Date(game.game_date + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}
             {game.opponent && ` vs ${game.opponent}`}
           </p>
@@ -177,8 +177,8 @@ export default function GameRosterPage() {
             />
           </div>
 
-          <div className="bg-white rounded-xl p-6 print:hidden">
-            <div className="flex gap-3 justify-end">
+          <div className="bg-white rounded-xl p-4 sm:p-6 print:hidden">
+            <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
               <Button
                 onClick={handleGenerateLineup}
                 disabled={isGenerating || playingPlayers.length === 0}

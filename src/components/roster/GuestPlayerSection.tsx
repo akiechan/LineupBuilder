@@ -42,12 +42,44 @@ export default function GuestPlayerSection({
     onUpdate(guests.filter(g => g.id !== id));
   };
 
-  const skillLabels = ['', 'Beginner', 'Intermediate', 'Advanced'];
-  const goalieLabels = ['', 'Wants to', 'Willing', 'Prefers not'];
+  const skillLabels = ['', 'Beginner', 'Mid', 'Advanced'];
+  const goalieLabels = ['', 'Wants to', 'Willing', 'No'];
+
+  const ToggleGroup = ({
+    label,
+    options,
+    value,
+    onChange,
+  }: {
+    label: string;
+    options: { value: string | number; label: string }[];
+    value: string | number;
+    onChange: (v: never) => void;
+  }) => (
+    <div>
+      <Label className="text-xs">{label}</Label>
+      <div className="flex gap-1 mt-1">
+        {options.map(opt => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value as never)}
+            className={`flex-1 px-1.5 py-2 rounded text-xs font-medium border transition-all min-h-[36px] ${
+              value === opt.value
+                ? 'border-green-500 bg-green-50 text-green-800'
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <Card className="print:hidden">
-      <CardHeader>
+      <CardHeader className="pb-3">
         <div className="flex justify-between items-center">
           <CardTitle className="flex items-center gap-2 text-lg">
             <UserPlus className="w-5 h-5" />
@@ -66,9 +98,9 @@ export default function GuestPlayerSection({
       </CardHeader>
       <CardContent>
         {showForm && (
-          <div className="border rounded-lg p-4 mb-4 bg-blue-50 space-y-3">
+          <div className="border rounded-lg p-3 mb-4 bg-blue-50 space-y-3">
             <div>
-              <Label htmlFor="guest-name">Name *</Label>
+              <Label htmlFor="guest-name" className="text-xs">Name *</Label>
               <Input
                 id="guest-name"
                 placeholder="Guest player name"
@@ -78,64 +110,25 @@ export default function GuestPlayerSection({
                 autoFocus
               />
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <Label>Gender</Label>
-                <div className="flex gap-1 mt-1">
-                  {['Male', 'Female'].map(g => (
-                    <button
-                      key={g}
-                      type="button"
-                      onClick={() => setGender(g)}
-                      className={`flex-1 px-2 py-1.5 rounded text-xs font-medium border transition-all ${
-                        gender === g
-                          ? 'border-green-500 bg-green-50 text-green-800'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      {g}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <Label>Skill</Label>
-                <div className="flex gap-1 mt-1">
-                  {[1, 2, 3].map(s => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setSkillLevel(s)}
-                      className={`flex-1 px-2 py-1.5 rounded text-xs font-medium border transition-all ${
-                        skillLevel === s
-                          ? 'border-green-500 bg-green-50 text-green-800'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      {skillLabels[s]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <Label>Goalie</Label>
-                <div className="flex gap-1 mt-1">
-                  {[1, 2, 3].map(g => (
-                    <button
-                      key={g}
-                      type="button"
-                      onClick={() => setGoaliePreference(g)}
-                      className={`flex-1 px-2 py-1.5 rounded text-xs font-medium border transition-all ${
-                        goaliePreference === g
-                          ? 'border-green-500 bg-green-50 text-green-800'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      {goalieLabels[g]}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <ToggleGroup
+                label="Gender"
+                options={[{ value: 'Male', label: 'Male' }, { value: 'Female', label: 'Female' }]}
+                value={gender}
+                onChange={setGender}
+              />
+              <ToggleGroup
+                label="Skill"
+                options={[1, 2, 3].map(s => ({ value: s, label: skillLabels[s] }))}
+                value={skillLevel}
+                onChange={setSkillLevel}
+              />
+              <ToggleGroup
+                label="Goalie"
+                options={[1, 2, 3].map(g => ({ value: g, label: goalieLabels[g] }))}
+                value={goaliePreference}
+                onChange={setGoaliePreference}
+              />
             </div>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
@@ -147,7 +140,7 @@ export default function GuestPlayerSection({
         )}
 
         {guests.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
             {guests.map(guest => (
               <div
                 key={guest.id}
@@ -161,9 +154,9 @@ export default function GuestPlayerSection({
                 </div>
                 <button
                   onClick={() => handleRemove(guest.id)}
-                  className="p-1 hover:bg-blue-100 rounded shrink-0"
+                  className="p-1.5 hover:bg-blue-100 rounded shrink-0"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  <Trash2 className="w-4 h-4 text-red-400" />
                 </button>
               </div>
             ))}

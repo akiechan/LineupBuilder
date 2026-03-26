@@ -90,8 +90,8 @@ export default function GoalTracker({
                         {goal.scorer_id ? '\u26BD' : '\u26BD'}{' '}
                         {goal.scorer_name}
                       </span>
-                      <button onClick={() => removeGoal(goal.id)} className="p-0.5 hover:bg-white/50 rounded">
-                        <Trash2 className="w-3 h-3" />
+                      <button onClick={() => removeGoal(goal.id)} className="p-1.5 hover:bg-white/50 rounded -mr-1">
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   ))}
@@ -105,21 +105,21 @@ export default function GoalTracker({
               {addingPeriod === period && (
                 <div className="border-t pt-2 mt-1 space-y-1">
                   <div className="text-xs text-gray-500 mb-1">Who scored?</div>
-                  <div className="grid grid-cols-2 gap-1 max-h-40 overflow-y-auto">
+                  <div className="grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto">
                     {players
                       .sort((a, b) => a.name.localeCompare(b.name))
                       .map(p => (
                         <button
                           key={p.id}
                           onClick={() => addGoal(period, p.id, p.name)}
-                          className="text-xs text-left px-2 py-1.5 rounded border border-green-200 bg-green-50 hover:bg-green-100 text-green-800 truncate"
+                          className="text-xs text-left px-2.5 py-2.5 rounded border border-green-200 bg-green-50 hover:bg-green-100 active:bg-green-200 text-green-800 truncate min-h-[40px]"
                         >
                           {p.jersey_number != null && `#${p.jersey_number} `}{p.name}
                         </button>
                       ))}
                     <button
                       onClick={() => addGoal(period, null, opponentName || 'Opponent')}
-                      className="text-xs text-left px-2 py-1.5 rounded border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 col-span-2"
+                      className="text-xs text-left px-2.5 py-2.5 rounded border border-red-200 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-700 col-span-2 min-h-[40px]"
                     >
                       {opponentName || 'Opponent'} goal
                     </button>

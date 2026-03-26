@@ -70,7 +70,7 @@ export default function GameCard({
         <Link href={`/games/${game.id}/roster`}>
           <Button className="w-full bg-green-600 hover:bg-green-700 gap-2">
             <ClipboardList className="w-4 h-4" />
-            Manage Lineup
+            Manage Game Details
           </Button>
         </Link>
       </CardContent>

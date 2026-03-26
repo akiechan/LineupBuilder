@@ -87,7 +87,8 @@ export default function PlayerTable({
 
   return (
     <div className="bg-white rounded-xl overflow-hidden shadow">
-      <Table>
+      <div className="overflow-x-auto">
+      <Table className="min-w-[700px]">
         <TableHeader>
           <TableRow className="bg-gray-50">
             {sortableHead('Jersey', 'jersey_number')}
@@ -156,6 +157,7 @@ export default function PlayerTable({
           ))}
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 }

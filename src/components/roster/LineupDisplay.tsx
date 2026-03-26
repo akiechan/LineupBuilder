@@ -288,7 +288,7 @@ export default function LineupDisplay({
                                                 <select
                                                   value={playerSlot.player_id}
                                                   onChange={(e) => swapPlayer(periodIndex, playerIndex, e.target.value)}
-                                                  className="flex-1 min-w-0 text-xs font-medium bg-gray-50 border border-gray-200 rounded px-1 py-0.5 print:hidden"
+                                                  className="flex-1 min-w-0 text-xs font-medium bg-gray-50 border border-gray-200 rounded px-1.5 py-1.5 print:hidden"
                                                 >
                                                   {lineupPlayers
                                                     .sort((a, b) => a.name.localeCompare(b.name))
@@ -304,11 +304,11 @@ export default function LineupDisplay({
                                               )}
                                               {editMode && (
                                                 <>
-                                                  <button onClick={() => toggleLock(periodIndex, playerIndex)} className="p-0.5 hover:bg-gray-100 rounded print:hidden shrink-0">
-                                                    {playerSlot.locked ? <Lock className="w-3.5 h-3.5 text-yellow-600" /> : <Unlock className="w-3.5 h-3.5 text-gray-400" />}
+                                                  <button onClick={() => toggleLock(periodIndex, playerIndex)} className="p-1.5 hover:bg-gray-100 rounded print:hidden shrink-0 -mr-0.5">
+                                                    {playerSlot.locked ? <Lock className="w-4 h-4 text-yellow-600" /> : <Unlock className="w-4 h-4 text-gray-400" />}
                                                   </button>
-                                                  <button onClick={() => removePlayer(periodIndex, playerIndex)} className="p-0.5 hover:bg-red-100 rounded print:hidden shrink-0" title="Remove player">
-                                                    <X className="w-3.5 h-3.5 text-red-400" />
+                                                  <button onClick={() => removePlayer(periodIndex, playerIndex)} className="p-1.5 hover:bg-red-100 rounded print:hidden shrink-0 -mr-1" title="Remove player">
+                                                    <X className="w-4 h-4 text-red-400" />
                                                   </button>
                                                 </>
                                               )}
