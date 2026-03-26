@@ -106,7 +106,7 @@ export function generateLineup(
   });
 
   const periodScore = (p: Player, period: number): number => {
-    const skill = ((p.skill_level || 2) - 1) / 2;
+    const skill = (3 - (p.skill_level || 2)) / 2; // 1=Strong→1.0, 2=Average→0.5, 3=Developing→0
     const att = ((p.attendance_pattern || 1) - 1) / 2;
     const dist = W_dist > 0
       ? 1 - Math.abs((p.skill_level || 2) - periodSkillTarget[period - 1]) / 2
@@ -125,7 +125,7 @@ export function generateLineup(
   };
 
   const bonusScore = (p: Player): number => {
-    const skill = ((p.skill_level || 2) - 1) / 2;
+    const skill = (3 - (p.skill_level || 2)) / 2; // 1=Strong→1.0, 3=Developing→0
     const att = ((p.attendance_pattern || 1) - 1) / 2;
     const fair = 1;
     const rand = Math.random() * 0.3;

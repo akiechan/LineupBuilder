@@ -254,12 +254,12 @@ describe('generateLineup', () => {
     const players: Player[] = [
       ...Array.from({ length: 5 }, (_, i) => ({
         id: `adv${i}`, team_id: 'team1', name: `Advanced ${i}`, jersey_number: i + 1,
-        gender: 'Male', skill_level: 3 as 1 | 2 | 3, attendance_pattern: 1,
+        gender: 'Male', skill_level: 1 as 1 | 2 | 3, attendance_pattern: 1, // 1=Strong
         goalie_preference: 3, position_preference: 'Field', created_at: '',
       })),
       ...Array.from({ length: 5 }, (_, i) => ({
         id: `dev${i}`, team_id: 'team1', name: `Developing ${i}`, jersey_number: i + 10,
-        gender: 'Male', skill_level: 1 as 1 | 2 | 3, attendance_pattern: 1,
+        gender: 'Male', skill_level: 3 as 1 | 2 | 3, attendance_pattern: 1, // 3=Developing
         goalie_preference: 3, position_preference: 'Field', created_at: '',
       })),
     ];
