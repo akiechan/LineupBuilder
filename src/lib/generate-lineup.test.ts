@@ -317,9 +317,12 @@ describe('generateLineup', () => {
       const lineup = generateLineup(game, players, attendance);
       const playCount = countPlays(lineup, players);
 
-      // Late players should still appear
+      // Late players should still appear but NOT in period 1
       expect(playCount['p1']).toBeGreaterThanOrEqual(1);
       expect(playCount['p2']).toBeGreaterThanOrEqual(1);
+      const period1Ids = lineup[0].players.map(s => s.player_id);
+      expect(period1Ids).not.toContain('p1');
+      expect(period1Ids).not.toContain('p2');
 
       lateTotal += playCount['p1'] + playCount['p2'];
       for (let i = 3; i <= 10; i++) onTimeTotal += playCount[`p${i}`];

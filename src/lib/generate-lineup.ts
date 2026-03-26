@@ -211,6 +211,16 @@ export function generateLineup(
     return baseMin;
   };
 
+  // Late players cannot be assigned to the first period (they haven't arrived yet)
+  const lateBannedPeriods = new Set<number>();
+  const lateBanCount = Math.max(1, Math.ceil(numPeriods / 4)); // ban first ~25% of periods
+  for (let i = 0; i < lateBanCount; i++) lateBannedPeriods.add(i);
+
+  const isPeriodAllowed = (playerId: string, pi: number) => {
+    if (!latePlayerIds.has(playerId)) return true;
+    return !lateBannedPeriods.has(pi);
+  };
+
   // Verify feasibility
   const totalFieldSlots = numPeriods * playersPerPeriod;
   let effectiveMin = minPerPlayer;
@@ -237,6 +247,7 @@ export function generateLineup(
 
     const availablePeriods = Array.from({ length: numPeriods }, (_, i) => i)
       .filter(pi => {
+        if (!isPeriodAllowed(player.id, pi)) return false;
         if (periodAssignments[pi].has(player.id)) return false;
         if (goalieByPeriod[pi] === player.id) return false;
         return periodAssignments[pi].size < playersPerPeriod;
@@ -264,6 +275,7 @@ export function generateLineup(
 
     const candidates = bonusEligible
       .filter(p => {
+        if (!isPeriodAllowed(p.id, pi)) return false;
         if (periodAssignments[pi].has(p.id)) return false;
         if (goalieByPeriod[pi] === p.id) return false;
         return true;
