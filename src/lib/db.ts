@@ -42,8 +42,12 @@ const initPromise = db.batch([
     created_at TEXT DEFAULT (datetime('now'))
   )`,
 ], 'write').then(() => Promise.all([
-  db.execute(`ALTER TABLE games ADD COLUMN has_goalie INTEGER DEFAULT 1`).catch(() => {/* already exists */}),
-  db.execute(`ALTER TABLE games ADD COLUMN guest_players TEXT DEFAULT '[]'`).catch(() => {/* already exists */}),
+  db.execute(`ALTER TABLE games ADD COLUMN has_goalie INTEGER DEFAULT 1`).catch(() => {}),
+  db.execute(`ALTER TABLE games ADD COLUMN guest_players TEXT DEFAULT '[]'`).catch(() => {}),
+  db.execute(`ALTER TABLE games ADD COLUMN score_us INTEGER`).catch(() => {}),
+  db.execute(`ALTER TABLE games ADD COLUMN score_opponent INTEGER`).catch(() => {}),
+  db.execute(`ALTER TABLE games ADD COLUMN notes TEXT`).catch(() => {}),
+  db.execute(`ALTER TABLE games ADD COLUMN goals TEXT DEFAULT '[]'`).catch(() => {}),
 ]));
 
 export { initPromise };

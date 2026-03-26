@@ -80,6 +80,10 @@ export interface Database {
           attendance: Json;
           lineup: Json;
           guest_players: Json;
+          goals: Json;
+          score_us: number | null;
+          score_opponent: number | null;
+          notes: string | null;
           created_at: string;
         };
         Insert: {
@@ -96,6 +100,10 @@ export interface Database {
           attendance?: Json;
           lineup?: Json;
           guest_players?: Json;
+          goals?: Json;
+          score_us?: number | null;
+          score_opponent?: number | null;
+          notes?: string | null;
         };
         Update: {
           id?: string;
@@ -111,6 +119,10 @@ export interface Database {
           attendance?: Json;
           lineup?: Json;
           guest_players?: Json;
+          goals?: Json;
+          score_us?: number | null;
+          score_opponent?: number | null;
+          notes?: string | null;
         };
       };
     };
@@ -127,6 +139,13 @@ export type GuestPlayer = {
   gender: string | null;
   skill_level: number;
   goalie_preference: number;
+};
+
+export type GoalRecord = {
+  id: string;
+  period: number;
+  scorer_id: string | null; // null = opponent goal
+  scorer_name: string;      // display name (player name or "Opponent")
 };
 
 export type AttendanceRecord = {

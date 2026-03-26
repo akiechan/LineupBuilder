@@ -4,17 +4,17 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Shield, Lock, Unlock, GripVertical, X } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
-import type { Player, LineupPeriod } from '@/lib/database.types';
-
-const POSITIONS = ['Field', 'Forward', 'Midfield', 'Defense', 'Wing', 'Striker', 'Sweeper'];
+import type { Player, LineupPeriod, AttendanceRecord } from '@/lib/database.types';
 
 export default function LineupDisplay({
   lineup,
   players,
+  attendance,
   onUpdateLineup,
 }: {
   lineup: LineupPeriod[];
   players: Player[];
+  attendance: AttendanceRecord[];
   onUpdateLineup: (lineup: LineupPeriod[]) => void;
 }) {
   const [editMode, setEditMode] = useState(false);
@@ -30,25 +30,13 @@ export default function LineupDisplay({
     onUpdateLineup(newLineup);
   };
 
-  const updatePosition = (periodIndex: number, playerIndex: number, position: string) => {
-    const newLineup = lineup.map(p => ({ ...p, players: [...p.players] }));
-    newLineup[periodIndex].players[playerIndex] = {
-      ...newLineup[periodIndex].players[playerIndex],
-      position,
-    };
-    onUpdateLineup(newLineup);
-  };
-
   const swapPlayer = (periodIndex: number, playerIndex: number, newPlayerId: string) => {
     const newLineup = lineup.map(p => ({ ...p, players: [...p.players] }));
     const oldPlayerId = newLineup[periodIndex].players[playerIndex].player_id;
     if (oldPlayerId === newPlayerId) return;
 
-    // Find if the new player is already in a slot somewhere (field or goalie)
     for (let qi = 0; qi < newLineup.length; qi++) {
-      // Check goalie
       if (newLineup[qi].goalie === newPlayerId) {
-        // Swap: old player becomes goalie there, new player takes field slot here
         newLineup[qi].goalie = oldPlayerId;
         newLineup[periodIndex].players[playerIndex] = {
           ...newLineup[periodIndex].players[playerIndex],
@@ -57,10 +45,8 @@ export default function LineupDisplay({
         onUpdateLineup(newLineup);
         return;
       }
-      // Check field players
       for (let pi = 0; pi < newLineup[qi].players.length; pi++) {
         if (newLineup[qi].players[pi].player_id === newPlayerId) {
-          // Swap the two field slots
           newLineup[qi].players[pi] = {
             ...newLineup[qi].players[pi],
             player_id: oldPlayerId,
@@ -75,7 +61,6 @@ export default function LineupDisplay({
       }
     }
 
-    // Player not found anywhere in lineup - just assign them
     newLineup[periodIndex].players[playerIndex] = {
       ...newLineup[periodIndex].players[playerIndex],
       player_id: newPlayerId,
@@ -88,7 +73,6 @@ export default function LineupDisplay({
     const oldGoalieId = newLineup[periodIndex].goalie;
     if (oldGoalieId === newGoalieId) return;
 
-    // Find where the new goalie currently is
     for (let qi = 0; qi < newLineup.length; qi++) {
       if (newLineup[qi].goalie === newGoalieId) {
         newLineup[qi].goalie = oldGoalieId;
@@ -117,7 +101,6 @@ export default function LineupDisplay({
     const { source, destination, type } = result;
     if (!destination) return;
 
-    // Quarter reorder
     if (type === 'quarter') {
       if (source.index === destination.index) return;
       const newLineup = lineup.map(p => ({ ...p, players: [...p.players] }));
@@ -128,7 +111,6 @@ export default function LineupDisplay({
       return;
     }
 
-    // Player reorder/swap
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
     const newLineup = lineup.map(p => ({ ...p, players: [...p.players] }));
@@ -157,6 +139,16 @@ export default function LineupDisplay({
     onUpdateLineup(newLineup);
   };
 
+  // All players available for the game (playing + late)
+  const availablePlayerIds = new Set<string>();
+  if (attendance.length === 0) {
+    players.forEach(p => availablePlayerIds.add(p.id));
+  } else {
+    attendance.forEach(a => {
+      if (a.status === 'playing' || a.status === 'late') availablePlayerIds.add(a.player_id);
+    });
+  }
+
   // All players in the lineup (for dropdowns)
   const allLineupPlayerIds = new Set<string>();
   lineup.forEach(p => {
@@ -167,6 +159,16 @@ export default function LineupDisplay({
 
   const playerLabel = (p: Player) =>
     p.jersey_number != null ? `#${p.jersey_number} ${p.name}` : p.name;
+
+  // Compute bench players per period
+  const getBenchPlayers = (period: LineupPeriod) => {
+    const activeIds = new Set<string>();
+    if (period.goalie) activeIds.add(period.goalie);
+    period.players.forEach(s => activeIds.add(s.player_id));
+    return players
+      .filter(p => availablePlayerIds.has(p.id) && !activeIds.has(p.id))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  };
 
   return (
     <div className="space-y-4">
@@ -179,7 +181,7 @@ export default function LineupDisplay({
 
       {editMode && (
         <p className="text-xs text-gray-500 print:hidden">
-          Drag quarters to reorder. Drag players or use dropdowns to swap. Click position to change.
+          Drag quarters to reorder. Drag players or use dropdowns to swap. Lock players to preserve on regeneration.
         </p>
       )}
 
@@ -193,6 +195,7 @@ export default function LineupDisplay({
             >
               {lineup.map((period, periodIndex) => {
                 const goalie = getPlayerById(period.goalie);
+                const bench = getBenchPlayers(period);
                 return (
                   <Draggable
                     key={`quarter-${periodIndex}`}
@@ -299,22 +302,6 @@ export default function LineupDisplay({
                                                   {player?.jersey_number != null && ` (#${player.jersey_number})`}
                                                 </div>
                                               )}
-                                              {editMode ? (
-                                                <select
-                                                  value={playerSlot.position}
-                                                  onChange={(e) => updatePosition(periodIndex, playerIndex, e.target.value)}
-                                                  className="text-xs bg-gray-50 border border-gray-200 rounded px-1 py-0.5 shrink-0 max-w-[72px] print:hidden"
-                                                >
-                                                  {POSITIONS.map(pos => (
-                                                    <option key={pos} value={pos}>{pos}</option>
-                                                  ))}
-                                                  {!POSITIONS.includes(playerSlot.position) && (
-                                                    <option value={playerSlot.position}>{playerSlot.position}</option>
-                                                  )}
-                                                </select>
-                                              ) : (
-                                                <div className="text-xs text-gray-500 shrink-0">{playerSlot.position}</div>
-                                              )}
                                               {editMode && (
                                                 <>
                                                   <button onClick={() => toggleLock(periodIndex, playerIndex)} className="p-0.5 hover:bg-gray-100 rounded print:hidden shrink-0">
@@ -336,6 +323,20 @@ export default function LineupDisplay({
                               )}
                             </Droppable>
                           </div>
+
+                          {/* Bench / Sitting Out */}
+                          {bench.length > 0 && (
+                            <div className="mt-3 pt-2 border-t border-dashed border-gray-200">
+                              <div className="text-xs font-medium text-gray-400 mb-1">Bench</div>
+                              <div className="flex flex-wrap gap-1">
+                                {bench.map(p => (
+                                  <span key={p.id} className="text-xs text-gray-400 bg-gray-50 rounded px-1.5 py-0.5">
+                                    {p.jersey_number != null ? `#${p.jersey_number}` : p.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     )}

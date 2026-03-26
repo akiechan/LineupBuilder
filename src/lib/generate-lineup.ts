@@ -1,11 +1,23 @@
 import type { Player, Game, LineupPeriod, AttendanceRecord } from './database.types';
 
-export function generateLineup(game: Game, allPlayers: Player[], currentAttendance?: AttendanceRecord[]): LineupPeriod[] {
+export function generateLineup(
+  game: Game,
+  allPlayers: Player[],
+  currentAttendance?: AttendanceRecord[],
+  existingLineup?: LineupPeriod[],
+): LineupPeriod[] {
   const attendance = currentAttendance ?? (game.attendance || []) as AttendanceRecord[];
+
+  // Include both 'playing' and 'late' players. Late players get reduced periods.
+  const latePlayerIds = new Set<string>();
   const playingPlayers = attendance.length === 0
     ? allPlayers
     : allPlayers.filter(p => {
         const record = attendance.find(a => a.player_id === p.id);
+        if (record?.status === 'late') {
+          latePlayerIds.add(p.id);
+          return true;
+        }
         return record?.status === 'playing';
       });
 
@@ -34,20 +46,21 @@ export function generateLineup(game: Game, allPlayers: Player[], currentAttendan
   const strategyWeight = (name: string): number => {
     const rank = strategies.indexOf(name);
     if (rank === -1) return 0;
-    // Higher priority (lower index) = higher weight
     return 3 * (enabledCount - rank) / enabledCount;
   };
 
-  const W_bench = 4;   // always on - prevents consecutive sits
-  const W_rand = 1.5;  // always on - variety on each regenerate
-  const W_fair = strategyWeight('playing_time_weighted');
   const W_skill = strategyWeight('skill_weighted');
   const W_att = strategyWeight('attendance_weighted');
+  const W_fair = strategyWeight('playing_time_weighted');
   const genderEnabled = strategies.includes('gender_weighted');
   const skillDistMode = strategies.includes('skill_grouped') ? 'grouped'
     : strategies.includes('skill_balanced') ? 'balanced'
     : 'none';
-  const W_dist = skillDistMode !== 'none' ? 3 : 0; // fixed weight when enabled
+  const W_dist = skillDistMode !== 'none' ? 3 : 0;
+
+  // --- Playing time guarantees ---
+  const totalSlots = numPeriods * playersPerPeriod + (hasGoalie && countGoalieTime ? numPeriods : 0);
+  const minPerPlayer = Math.floor(totalSlots / totalAttending);
 
   // --- Goalie selection ---
   let eligibleGoalies: Player[] = [];
@@ -68,18 +81,13 @@ export function generateLineup(game: Game, allPlayers: Player[], currentAttendan
     return fieldPlayCount[playerId];
   };
 
-  const benchStreak: Record<string, number> = {};
-  playingPlayers.forEach(p => { benchStreak[p.id] = 0; });
-
   // --- Skill distribution targets per period ---
   const periodSkillTarget: number[] = [];
   if (W_dist > 0) {
     const overallAvg = playingPlayers.reduce((sum, p) => sum + (p.skill_level || 2), 0) / playingPlayers.length;
     if (skillDistMode === 'balanced') {
-      // Balanced: every period targets the overall average (spreads skill levels evenly)
       for (let i = 0; i < numPeriods; i++) periodSkillTarget.push(overallAvg);
     } else {
-      // Grouped: each period targets a different skill tier (clusters similar skills)
       const sortedBySkill = [...playingPlayers].sort((a, b) => (b.skill_level || 2) - (a.skill_level || 2));
       const groupSize = Math.ceil(sortedBySkill.length / numPeriods);
       for (let i = 0; i < numPeriods; i++) {
@@ -92,143 +100,256 @@ export function generateLineup(game: Game, allPlayers: Player[], currentAttendan
     }
   }
 
-  let currentGoalie: Player | null = null;
-  let periodsSinceGoalieChange = 0;
-  const lineup: LineupPeriod[] = [];
-
-  // Pre-generate random values for each player per period (deterministic per call, random across calls)
   const randomValues: Record<string, number[]> = {};
   playingPlayers.forEach(p => {
     randomValues[p.id] = Array.from({ length: numPeriods }, () => Math.random());
   });
 
+  const periodScore = (p: Player, period: number): number => {
+    const skill = ((p.skill_level || 2) - 1) / 2;
+    const att = ((p.attendance_pattern || 1) - 1) / 2;
+    const dist = W_dist > 0
+      ? 1 - Math.abs((p.skill_level || 2) - periodSkillTarget[period - 1]) / 2
+      : 0;
+    const rand = randomValues[p.id][period - 1];
+    // Late players get a penalty in early periods (they arrive late)
+    const latePenalty = latePlayerIds.has(p.id) && period <= Math.ceil(numPeriods / 3) ? -10 : 0;
+
+    return (
+      W_skill * skill +
+      W_att * att +
+      W_dist * dist +
+      1.0 * rand +
+      latePenalty
+    );
+  };
+
+  const bonusScore = (p: Player): number => {
+    const skill = ((p.skill_level || 2) - 1) / 2;
+    const att = ((p.attendance_pattern || 1) - 1) / 2;
+    const fair = 1;
+    const rand = Math.random() * 0.3;
+    // Late players get slight penalty for bonus slots
+    const latePenalty = latePlayerIds.has(p.id) ? -0.5 : 0;
+
+    return (
+      W_skill * skill +
+      W_att * att +
+      W_fair * fair +
+      rand +
+      latePenalty
+    );
+  };
+
+  // ============================================================
+  // TWO-PHASE ALLOCATION
+  // Phase 0: Pre-assign locked players from existing lineup
+  // Phase 1: Assign each player their minimum guaranteed periods
+  // Phase 2: Fill remaining bonus slots using priority scoring
+  // ============================================================
+
+  const periodAssignments: Set<string>[] = Array.from({ length: numPeriods }, () => new Set());
+  const lockedSlots: Map<string, Set<number>> = new Map(); // player_id -> set of period indices
+
+  // --- Phase 0: Preserve locked players from existing lineup ---
+  if (existingLineup) {
+    for (let pi = 0; pi < Math.min(existingLineup.length, numPeriods); pi++) {
+      const period = existingLineup[pi];
+      for (const slot of period.players) {
+        if (slot.locked && playingPlayers.some(p => p.id === slot.player_id)) {
+          periodAssignments[pi].add(slot.player_id);
+          if (!lockedSlots.has(slot.player_id)) lockedSlots.set(slot.player_id, new Set());
+          lockedSlots.get(slot.player_id)!.add(pi);
+        }
+      }
+    }
+  }
+
+  // --- Goalie assignment (counts toward play time) ---
+  let currentGoalie: Player | null = null;
+  let periodsSinceGoalieChange = 0;
+  const goalieByPeriod: (string | null)[] = [];
+
   for (let period = 1; period <= numPeriods; period++) {
-    // --- Pick goalie (if applicable) ---
-    let goalie: Player | null = null;
-
-    if (hasGoalie) {
-      if (currentGoalie && periodsSinceGoalieChange < goalieRotation) {
-        goalie = currentGoalie;
-        periodsSinceGoalieChange++;
-      } else {
-        const sortedGoalies = [...eligibleGoalies].sort((a, b) => {
-          const goalieDiff = goaliePlayCount[a.id] - goaliePlayCount[b.id];
-          if (goalieDiff !== 0) return goalieDiff;
-          const playDiff = getEffectivePlayCount(a.id) - getEffectivePlayCount(b.id);
-          if (playDiff !== 0) return playDiff;
-          return (a.goalie_preference + Math.random()) - (b.goalie_preference + Math.random());
-        });
-        goalie = sortedGoalies.find(g => g.id !== currentGoalie?.id) || sortedGoalies[0];
-        currentGoalie = goalie;
-        periodsSinceGoalieChange = 1;
-      }
-      goaliePlayCount[goalie.id]++;
+    if (!hasGoalie) {
+      goalieByPeriod.push(null);
+      continue;
     }
 
-    // --- Score and rank field player candidates ---
-    const candidates = goalie
-      ? playingPlayers.filter(p => p.id !== goalie!.id)
-      : [...playingPlayers];
+    let goalie: Player;
+    if (currentGoalie && periodsSinceGoalieChange < goalieRotation) {
+      goalie = currentGoalie;
+      periodsSinceGoalieChange++;
+    } else {
+      const sortedGoalies = [...eligibleGoalies].sort((a, b) => {
+        const goalieDiff = goaliePlayCount[a.id] - goaliePlayCount[b.id];
+        if (goalieDiff !== 0) return goalieDiff;
+        const playDiff = getEffectivePlayCount(a.id) - getEffectivePlayCount(b.id);
+        if (playDiff !== 0) return playDiff;
+        return (a.goalie_preference + Math.random()) - (b.goalie_preference + Math.random());
+      });
+      goalie = sortedGoalies.find(g => g.id !== currentGoalie?.id) || sortedGoalies[0];
+      currentGoalie = goalie;
+      periodsSinceGoalieChange = 1;
+    }
 
-    const needToPlay = (p: Player): number => {
-      const playCount = getEffectivePlayCount(p.id);
+    goaliePlayCount[goalie.id]++;
+    goalieByPeriod.push(goalie.id);
+  }
 
-      // Fairness: how underplayed (1 = never played, 0 = played every period so far)
-      const fairness = period === 1 ? 1 : 1 - playCount / (period - 1);
+  // --- Phase 1: Assign minimum periods to every player ---
+  const assignedCount: Record<string, number> = {};
+  playingPlayers.forEach(p => {
+    const goalieCount = countGoalieTime ? goalieByPeriod.filter(g => g === p.id).length : 0;
+    const lockedCount = lockedSlots.get(p.id)?.size ?? 0;
+    assignedCount[p.id] = goalieCount + lockedCount;
+  });
 
-      // Bench urgency: consecutive periods sat out, capped at 3
-      const bench = Math.min(benchStreak[p.id], 3) / 3;
+  // Late players get reduced minimum: max(1, effectiveMin - 1)
+  const getPlayerMin = (p: Player, baseMin: number) => {
+    if (latePlayerIds.has(p.id)) return Math.max(1, baseMin - 1);
+    return baseMin;
+  };
 
-      // Skill bonus: normalized 0-1 (skill 1=0, 2=0.5, 3=1)
-      const skill = ((p.skill_level || 2) - 1) / 2;
+  // Verify feasibility
+  const totalFieldSlots = numPeriods * playersPerPeriod;
+  let effectiveMin = minPerPlayer;
+  while (effectiveMin > 0) {
+    const totalFieldNeeded = playingPlayers.reduce((sum, p) =>
+      sum + Math.max(0, getPlayerMin(p, effectiveMin) - assignedCount[p.id]), 0);
+    if (totalFieldNeeded <= totalFieldSlots) break;
+    effectiveMin--;
+  }
 
-      // Attendance rarity: rare attendees get priority when present
-      // attendance_pattern 1=always(0), 2=sometimes(0.5), 3=rarely(1)
-      const att = ((p.attendance_pattern || 1) - 1) / 2;
+  const playersNeedingMin = playingPlayers
+    .filter(p => assignedCount[p.id] < getPlayerMin(p, effectiveMin))
+    .sort((a, b) => {
+      const needA = getPlayerMin(a, effectiveMin) - assignedCount[a.id];
+      const needB = getPlayerMin(b, effectiveMin) - assignedCount[b.id];
+      if (needA !== needB) return needB - needA;
+      return bonusScore(a) - bonusScore(b);
+    });
 
-      // Skill distribution: bonus for matching this period's target skill level (1.0 = exact, 0 = far)
-      const dist = W_dist > 0
-        ? 1 - Math.abs((p.skill_level || 2) - periodSkillTarget[period - 1]) / 2
-        : 0;
+  for (const player of playersNeedingMin) {
+    const playerMin = getPlayerMin(player, effectiveMin);
+    const periodsNeeded = playerMin - assignedCount[player.id];
+    if (periodsNeeded <= 0) continue;
 
-      // Random jitter for variety
-      const rand = randomValues[p.id][period - 1];
+    const availablePeriods = Array.from({ length: numPeriods }, (_, i) => i)
+      .filter(pi => {
+        if (periodAssignments[pi].has(player.id)) return false;
+        if (goalieByPeriod[pi] === player.id) return false;
+        return periodAssignments[pi].size < playersPerPeriod;
+      })
+      .sort((a, b) => {
+        const slotDiff = periodAssignments[a].size - periodAssignments[b].size;
+        if (slotDiff !== 0) return slotDiff;
+        return periodScore(player, b + 1) - periodScore(player, a + 1);
+      });
 
-      return (
-        W_bench * bench +
-        W_fair * fairness +
-        W_skill * skill +
-        W_att * att +
-        W_dist * dist +
-        W_rand * rand
+    for (let i = 0; i < Math.min(periodsNeeded, availablePeriods.length); i++) {
+      const pi = availablePeriods[i];
+      periodAssignments[pi].add(player.id);
+      assignedCount[player.id]++;
+    }
+  }
+
+  // --- Phase 2: Fill remaining bonus slots ---
+  const bonusEligible = [...playingPlayers]
+    .sort((a, b) => bonusScore(b) - bonusScore(a));
+
+  for (let pi = 0; pi < numPeriods; pi++) {
+    const remaining = playersPerPeriod - periodAssignments[pi].size;
+    if (remaining <= 0) continue;
+
+    const candidates = bonusEligible
+      .filter(p => {
+        if (periodAssignments[pi].has(p.id)) return false;
+        if (goalieByPeriod[pi] === p.id) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const playDiff = assignedCount[a.id] - assignedCount[b.id];
+        if (playDiff !== 0) return playDiff;
+        return periodScore(b, pi + 1) - periodScore(a, pi + 1);
+      });
+
+    for (let i = 0; i < Math.min(remaining, candidates.length); i++) {
+      periodAssignments[pi].add(candidates[i].id);
+      assignedCount[candidates[i].id]++;
+    }
+  }
+
+  // --- Gender balance pass ---
+  if (genderEnabled) {
+    const totalFemale = playingPlayers.filter(p => p.gender === 'Female').length;
+    const targetFemalePerPeriod = Math.round((totalFemale / totalAttending) * playersPerPeriod);
+    const fairPlayIsFirst = strategies[0] === 'playing_time_weighted';
+
+    for (let pi = 0; pi < numPeriods; pi++) {
+      const assigned = [...periodAssignments[pi]];
+      const playerMap = new Map(playingPlayers.map(p => [p.id, p]));
+
+      const females = assigned.filter(id => playerMap.get(id)?.gender === 'Female');
+      const males = assigned.filter(id => playerMap.get(id)?.gender !== 'Female');
+      const currentFemale = females.length;
+
+      if (currentFemale === targetFemalePerPeriod) continue;
+
+      const bench = playingPlayers.filter(p =>
+        !periodAssignments[pi].has(p.id) && goalieByPeriod[pi] !== p.id
       );
-    };
 
-    // Sort candidates by needToPlay descending (highest need plays)
-    const sorted = [...candidates].sort((a, b) => needToPlay(b) - needToPlay(a));
-    let periodPlayers = sorted.slice(0, playersPerPeriod);
+      const canSwapOut = (id: string) => {
+        if (lockedSlots.get(id)?.has(pi)) return false; // never swap locked
+        if (!fairPlayIsFirst) return true;
+        return assignedCount[id] > effectiveMin;
+      };
 
-    // --- Gender balance (soft constraint) ---
-    // Spread girls evenly across periods rather than clustering.
-    // When fair play is the TOP priority, gender swaps must not prevent any
-    // player from reaching their minimum guaranteed periods.
-    if (genderEnabled) {
-      const totalFemale = candidates.filter(p => p.gender === 'Female').length;
-      const targetFemale = Math.round((totalFemale / candidates.length) * playersPerPeriod);
-
-      const fairPlayIsFirst = strategies[0] === 'playing_time_weighted';
-      const minPeriodsPerPlayer = Math.floor((numPeriods * playersPerPeriod) / totalAttending);
-      const isSwapSafe = (p: Player) =>
-        !fairPlayIsFirst || getEffectivePlayCount(p.id) >= minPeriodsPerPlayer;
-
-      const selectedFemale = periodPlayers.filter(p => p.gender === 'Female').length;
-      const benchPlayers = sorted.slice(playersPerPeriod);
-
-      if (selectedFemale > targetFemale) {
-        const girlsToSwap = selectedFemale - targetFemale;
-        const swappableGirls = [...periodPlayers]
-          .filter(p => p.gender === 'Female' && isSwapSafe(p))
-          .sort((a, b) => needToPlay(a) - needToPlay(b));
-        const benchBoys = benchPlayers.filter(p => p.gender !== 'Female');
-
-        for (let i = 0; i < Math.min(girlsToSwap, benchBoys.length, swappableGirls.length); i++) {
-          const swapOut = swappableGirls[i];
-          const swapIn = benchBoys[i];
-          periodPlayers = periodPlayers.map(p => p.id === swapOut.id ? swapIn : p);
+      if (currentFemale > targetFemalePerPeriod) {
+        const excess = currentFemale - targetFemalePerPeriod;
+        const swappableGirls = females.filter(canSwapOut);
+        const benchBoys = bench.filter(p => p.gender !== 'Female');
+        for (let i = 0; i < Math.min(excess, swappableGirls.length, benchBoys.length); i++) {
+          periodAssignments[pi].delete(swappableGirls[i]);
+          periodAssignments[pi].add(benchBoys[i].id);
+          assignedCount[swappableGirls[i]]--;
+          assignedCount[benchBoys[i].id]++;
         }
-      } else if (selectedFemale < targetFemale) {
-        const girlsNeeded = targetFemale - selectedFemale;
-        const swappableBoys = [...periodPlayers]
-          .filter(p => p.gender !== 'Female' && isSwapSafe(p))
-          .sort((a, b) => needToPlay(a) - needToPlay(b));
-        const benchGirls = benchPlayers.filter(p => p.gender === 'Female');
-
-        for (let i = 0; i < Math.min(girlsNeeded, benchGirls.length, swappableBoys.length); i++) {
-          const swapOut = swappableBoys[i];
-          const swapIn = benchGirls[i];
-          periodPlayers = periodPlayers.map(p => p.id === swapOut.id ? swapIn : p);
+      } else {
+        const deficit = targetFemalePerPeriod - currentFemale;
+        const swappableBoys = males.filter(canSwapOut);
+        const benchGirls = bench.filter(p => p.gender === 'Female');
+        for (let i = 0; i < Math.min(deficit, swappableBoys.length, benchGirls.length); i++) {
+          periodAssignments[pi].delete(swappableBoys[i]);
+          periodAssignments[pi].add(benchGirls[i].id);
+          assignedCount[swappableBoys[i]]--;
+          assignedCount[benchGirls[i].id]++;
         }
       }
     }
+  }
 
-    // --- Update tracking ---
-    const playingIds = new Set(periodPlayers.map(p => p.id));
-    periodPlayers.forEach(p => {
-      fieldPlayCount[p.id]++;
-      benchStreak[p.id] = 0;
-    });
-    candidates.forEach(p => {
-      if (!playingIds.has(p.id)) benchStreak[p.id]++;
-    });
+  // --- Build final lineup from assignments ---
+  const lineup: LineupPeriod[] = [];
+  for (let pi = 0; pi < numPeriods; pi++) {
+    const goalieId = goalieByPeriod[pi];
+    const fieldPlayerIds = [...periodAssignments[pi]].filter(id => id !== goalieId);
+
+    fieldPlayerIds.forEach(id => { fieldPlayCount[id]++; });
 
     lineup.push({
-      period,
-      goalie: goalie?.id ?? '',
-      players: periodPlayers.map(p => ({
-        player_id: p.id,
-        position: p.position_preference || 'Field',
-        locked: false,
-      })),
+      period: pi + 1,
+      goalie: goalieId ?? '',
+      players: fieldPlayerIds.map(id => {
+        const player = playingPlayers.find(p => p.id === id);
+        const isLocked = lockedSlots.get(id)?.has(pi) ?? false;
+        return {
+          player_id: id,
+          position: player?.position_preference || 'Field',
+          locked: isLocked,
+        };
+      }),
     });
   }
 

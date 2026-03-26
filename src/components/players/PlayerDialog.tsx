@@ -77,12 +77,12 @@ export default function PlayerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{player ? 'Edit Player' : 'Add Player'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="name">Player Name *</Label>
               <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
@@ -112,7 +112,7 @@ export default function PlayerDialog({
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="skill">Skill Level</Label>
               <Select value={String(formData.skill_level)} onValueChange={(v) => setFormData({ ...formData, skill_level: Number(v) })}>

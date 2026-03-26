@@ -38,7 +38,7 @@ export default function AttendanceSection({
 
   const toggleStatus = (playerId: string) => {
     const currentStatus = getPlayerStatus(playerId);
-    const statusOrder: Array<'absent' | 'playing' | 'late'> = ['absent', 'playing', 'late'];
+    const statusOrder: Array<'playing' | 'absent' | 'late'> = ['playing', 'absent', 'late'];
     const currentIndex = statusOrder.indexOf(currentStatus);
     const newStatus = statusOrder[(currentIndex + 1) % statusOrder.length];
 
@@ -97,7 +97,7 @@ export default function AttendanceSection({
           })}
         </div>
         <p className="text-xs text-gray-500 mt-4 text-center">
-          Click to change: Playing &rarr; Late &rarr; Absent &rarr; Playing
+          Click to change: Playing &rarr; Absent &rarr; Late &rarr; Playing
         </p>
       </CardContent>
     </Card>

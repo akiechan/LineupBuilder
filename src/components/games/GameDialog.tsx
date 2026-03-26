@@ -134,7 +134,7 @@ export default function GameDialog({
               <Input id="opponent" placeholder="e.g., Blue Tigers" value={formData.opponent} onChange={(e) => setFormData({ ...formData, opponent: e.target.value })} />
             </div>
           </div>
-          <div className={`grid gap-3 ${formData.has_goalie ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <div className={`grid gap-3 grid-cols-2 ${formData.has_goalie ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
             <div>
               <Label htmlFor="periods">Periods</Label>
               <Input id="periods" type="number" min="2" max="8" value={String(formData.num_periods)} onChange={(e) => setFormData({ ...formData, num_periods: parseInt(e.target.value) || 0 })} />

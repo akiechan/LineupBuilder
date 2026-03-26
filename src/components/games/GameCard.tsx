@@ -58,6 +58,14 @@ export default function GameCard({
           {game.strategy_priorities && game.strategy_priorities.length > 0 && (
             <div>Priority: {game.strategy_priorities.map(s => strategyLabels[s]).join(' > ')}</div>
           )}
+          {game.score_us != null && game.score_opponent != null && (
+            <div className="font-semibold text-base">
+              Score: {game.score_us} - {game.score_opponent}
+              {game.score_us > game.score_opponent && <span className="ml-1.5 text-green-600 text-xs">W</span>}
+              {game.score_us < game.score_opponent && <span className="ml-1.5 text-red-600 text-xs">L</span>}
+              {game.score_us === game.score_opponent && <span className="ml-1.5 text-gray-500 text-xs">D</span>}
+            </div>
+          )}
         </div>
         <Link href={`/games/${game.id}/roster`}>
           <Button className="w-full bg-green-600 hover:bg-green-700 gap-2">

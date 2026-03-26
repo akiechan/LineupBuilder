@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { useGame, useUpdateGameAttendance, useUpdateGameLineup, useUpdateGameGuestPlayers } from '@/hooks/use-games';
+import { useGame, useUpdateGame, useUpdateGameAttendance, useUpdateGameLineup, useUpdateGameGuestPlayers } from '@/hooks/use-games';
 import { useTeam } from '@/hooks/use-teams';
 import { usePlayers } from '@/hooks/use-players';
 import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ArrowLeft, RefreshCw, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -13,8 +14,9 @@ import AttendanceSection from '@/components/roster/AttendanceSection';
 import GuestPlayerSection from '@/components/roster/GuestPlayerSection';
 import LineupDisplay from '@/components/roster/LineupDisplay';
 import PlayerStats from '@/components/roster/PlayerStats';
+import GoalTracker from '@/components/roster/GoalTracker';
 import { generateLineup } from '@/lib/generate-lineup';
-import type { Player, GuestPlayer, AttendanceRecord, LineupPeriod } from '@/lib/database.types';
+import type { Game, Player, GuestPlayer, GoalRecord, AttendanceRecord, LineupPeriod } from '@/lib/database.types';
 
 function guestToPlayer(guest: GuestPlayer, teamId: string): Player {
   return {
@@ -41,6 +43,7 @@ export default function GameRosterPage() {
   const { data: team } = useTeam(game?.team_id ?? null);
   const { data: teamPlayers = [] } = usePlayers(game?.team_id ?? null);
 
+  const updateGame = useUpdateGame();
   const updateAttendance = useUpdateGameAttendance(gameId);
   const updateLineup = useUpdateGameLineup(gameId);
   const updateGuestPlayers = useUpdateGameGuestPlayers(gameId);
@@ -97,15 +100,19 @@ export default function GameRosterPage() {
     ? allPlayers
     : allPlayers.filter(p => {
         const record = attendance.find(a => a.player_id === p.id);
-        return record?.status === 'playing';
+        return record?.status === 'playing' || record?.status === 'late';
       });
 
   const handleGenerateLineup = () => {
     if (!game) return;
+    const existingLineup = game.lineup as LineupPeriod[] | null;
+    if (existingLineup && !confirm('A lineup already exists. Regenerating will replace it (locked players will be preserved). Continue?')) {
+      return;
+    }
     setIsGenerating(true);
     try {
-      const lineup = generateLineup(game, allPlayers, attendance);
-      updateLineup.mutate(lineup as unknown as LineupPeriod[]);
+      const newLineup = generateLineup(game, allPlayers, attendance, existingLineup ?? undefined);
+      updateLineup.mutate(newLineup as unknown as LineupPeriod[]);
     } catch (error) {
       alert('Error generating lineup: ' + (error as Error).message);
     } finally {
@@ -195,6 +202,7 @@ export default function GameRosterPage() {
                 <LineupDisplay
                   lineup={lineup}
                   players={allPlayers}
+                  attendance={attendance}
                   onUpdateLineup={(l) => updateLineup.mutate(l as unknown as LineupPeriod[])}
                 />
               </div>
@@ -208,6 +216,43 @@ export default function GameRosterPage() {
               </div>
             </div>
           )}
+
+          {/* Goal Log */}
+          <GoalTracker
+            goals={(game.goals || []) as GoalRecord[]}
+            players={allPlayers}
+            numPeriods={game.num_periods || 4}
+            opponentName={game.opponent || 'Opponent'}
+            onUpdate={(goals) => {
+              const scoreUs = goals.filter(g => g.scorer_id !== null).length;
+              const scoreOpp = goals.filter(g => g.scorer_id === null).length;
+              updateGame.mutate({
+                id: game.id,
+                goals: goals as unknown as Game['goals'],
+                score_us: scoreUs,
+                score_opponent: scoreOpp,
+              });
+            }}
+          />
+
+          {/* Game Notes */}
+          <Card className="print:hidden">
+            <CardHeader>
+              <CardTitle className="text-lg">Game Notes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <textarea
+                className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                placeholder="Observations, player highlights, things to try next game..."
+                defaultValue={game.notes ?? ''}
+                onBlur={(e) => {
+                  if (e.target.value !== (game.notes ?? '')) {
+                    updateGame.mutate({ id: game.id, notes: e.target.value || null });
+                  }
+                }}
+              />
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

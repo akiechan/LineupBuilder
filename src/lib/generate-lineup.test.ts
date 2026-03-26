@@ -31,9 +31,24 @@ function makeGame(overrides?: Partial<Game>): Game {
     strategy_priorities: ['playing_time_weighted'],
     attendance: [],
     lineup: null,
+    guest_players: [],
+    goals: [],
+    score_us: null,
+    score_opponent: null,
+    notes: null,
     created_at: '',
     ...overrides,
   };
+}
+
+function countPlays(lineup: ReturnType<typeof generateLineup>, players: Player[]) {
+  const playCount: Record<string, number> = {};
+  players.forEach(p => { playCount[p.id] = 0; });
+  lineup.forEach(period => {
+    if (period.goalie) playCount[period.goalie]++;
+    period.players.forEach(s => playCount[s.player_id]++);
+  });
+  return playCount;
 }
 
 describe('generateLineup', () => {
@@ -47,17 +62,14 @@ describe('generateLineup', () => {
       { player_id: 'p5', status: 'playing' },
       { player_id: 'p6', status: 'playing' },
       { player_id: 'p7', status: 'playing' },
-      { player_id: 'p8', status: 'absent' },  // absent - not in game.attendance
+      { player_id: 'p8', status: 'absent' },
       { player_id: 'p9', status: 'playing' },
       { player_id: 'p10', status: 'playing' },
     ];
-    // p8 is absent
-    const absentAttendance = attendance;
 
-    const game = makeGame({ attendance: absentAttendance });
-    const lineup = generateLineup(game, players, absentAttendance);
+    const game = makeGame({ attendance });
+    const lineup = generateLineup(game, players, attendance);
 
-    // p8 should NOT appear anywhere in the lineup
     const allPlayerIds = new Set<string>();
     lineup.forEach(period => {
       if (period.goalie) allPlayerIds.add(period.goalie);
@@ -70,7 +82,6 @@ describe('generateLineup', () => {
 
   it('excludes players not in attendance array (treated as absent)', () => {
     const players = makePlayers(8);
-    // Only p1-p6 in attendance, p7 and p8 are missing (treated as absent)
     const attendance: AttendanceRecord[] = [
       { player_id: 'p1', status: 'playing' },
       { player_id: 'p2', status: 'playing' },
@@ -104,7 +115,6 @@ describe('generateLineup', () => {
       period.players.forEach(s => allPlayerIds.add(s.player_id));
     });
 
-    // All 8 players should appear
     expect(allPlayerIds.size).toBe(8);
   });
 
@@ -131,7 +141,6 @@ describe('generateLineup', () => {
       results.add(key);
     }
 
-    // Should have at least 2 different results in 10 tries
     expect(results.size).toBeGreaterThan(1);
   });
 
@@ -141,32 +150,19 @@ describe('generateLineup', () => {
     const game = makeGame({ strategy_priorities: ['playing_time_weighted'] });
 
     const lineup = generateLineup(game, players, attendance);
-
-    // Count total play time per player
-    const playCount: Record<string, number> = {};
-    players.forEach(p => { playCount[p.id] = 0; });
-    lineup.forEach(period => {
-      if (period.goalie) playCount[period.goalie]++;
-      period.players.forEach(s => playCount[s.player_id]++);
-    });
-
+    const playCount = countPlays(lineup, players);
     const counts = Object.values(playCount);
-    const min = Math.min(...counts);
-    const max = Math.max(...counts);
 
-    // With equal time as first priority, spread should be at most 2
-    expect(max - min).toBeLessThanOrEqual(2);
+    expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(2);
   });
 
   it('16 players 4x4 with fair play #1 + gender #2: every player plays exactly once', () => {
-    // Simulates the Kindergarten Dolphins scenario: 16 kids, 4 periods, 4 per period, no goalie
-    // 10 boys, 6 girls — gender swap must NOT drop anyone to 0 periods
     const players: Player[] = Array.from({ length: 16 }, (_, i) => ({
       id: `p${i + 1}`,
       team_id: 'team1',
       name: `Player ${i + 1}`,
       jersey_number: i + 1,
-      gender: i < 6 ? 'Female' : 'Male', // 6 girls, 10 boys
+      gender: i < 6 ? 'Female' : 'Male',
       skill_level: 2 as 1 | 2 | 3,
       attendance_pattern: 1,
       goalie_preference: 3,
@@ -181,17 +177,9 @@ describe('generateLineup', () => {
       strategy_priorities: ['playing_time_weighted', 'gender_weighted'],
     });
 
-    // Run 50 times to catch probabilistic failures
     for (let run = 0; run < 50; run++) {
       const lineup = generateLineup(game, players, attendance);
-
-      const playCount: Record<string, number> = {};
-      players.forEach(p => { playCount[p.id] = 0; });
-      lineup.forEach(period => {
-        period.players.forEach(s => playCount[s.player_id]++);
-      });
-
-      // 16 slots / 16 players = exactly 1 each. No one should have 0.
+      const playCount = countPlays(lineup, players);
       const counts = Object.values(playCount);
       expect(Math.min(...counts)).toBeGreaterThanOrEqual(1);
       expect(Math.max(...counts)).toBeLessThanOrEqual(1);
@@ -199,7 +187,6 @@ describe('generateLineup', () => {
   });
 
   it('gender swap works freely when fair play is NOT the first priority', () => {
-    // When gender is #1 and fair play is #2, gender can freely swap
     const players: Player[] = Array.from({ length: 16 }, (_, i) => ({
       id: `p${i + 1}`,
       team_id: 'team1',
@@ -220,8 +207,173 @@ describe('generateLineup', () => {
       strategy_priorities: ['gender_weighted', 'playing_time_weighted'],
     });
 
-    // Should not throw — gender swaps are unrestricted
     const lineup = generateLineup(game, players, attendance);
     expect(lineup.length).toBe(4);
+  });
+
+  it('skill #1 priority: no player plays 2x more than another', () => {
+    // Simulates the 2nd grade scenario: ~14 players, mixed skills, skill as #1
+    // Multiple goalie-eligible players for realistic rotation
+    const players: Player[] = Array.from({ length: 14 }, (_, i) => ({
+      id: `p${i + 1}`,
+      team_id: 'team1',
+      name: `Player ${i + 1}`,
+      jersey_number: i + 1,
+      gender: i < 5 ? 'Female' : 'Male',
+      skill_level: (i < 4 ? 3 : i < 9 ? 2 : 1) as 1 | 2 | 3, // 4 advanced, 5 mid, 5 developing
+      attendance_pattern: 1,
+      goalie_preference: i < 3 ? 1 : 3, // 3 goalie-eligible
+      position_preference: 'Field',
+      created_at: '',
+    }));
+    const attendance: AttendanceRecord[] = players.map(p => ({ player_id: p.id, status: 'playing' }));
+    const game = makeGame({
+      num_periods: 4,
+      players_per_period: 6,
+      has_goalie: true,
+      goalie_rotation_periods: 1,
+      strategy_priorities: ['skill_weighted'],
+    });
+
+    // Run 50 times — no one should get 2x another's time
+    for (let run = 0; run < 50; run++) {
+      const lineup = generateLineup(game, players, attendance);
+      const playCount = countPlays(lineup, players);
+      const counts = Object.values(playCount);
+      const min = Math.min(...counts);
+      const max = Math.max(...counts);
+
+      // 14 players, 28 total slots (24 field + 4 goalie) = ~2 each
+      // Spread should be at most 2 (e.g. 1 vs 3), never 2 vs 4
+      expect(min).toBeGreaterThanOrEqual(1);
+      expect(max - min).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('skill #1 gives skilled players bonus slots over developing', () => {
+    const players: Player[] = [
+      ...Array.from({ length: 5 }, (_, i) => ({
+        id: `adv${i}`, team_id: 'team1', name: `Advanced ${i}`, jersey_number: i + 1,
+        gender: 'Male', skill_level: 3 as 1 | 2 | 3, attendance_pattern: 1,
+        goalie_preference: 3, position_preference: 'Field', created_at: '',
+      })),
+      ...Array.from({ length: 5 }, (_, i) => ({
+        id: `dev${i}`, team_id: 'team1', name: `Developing ${i}`, jersey_number: i + 10,
+        gender: 'Male', skill_level: 1 as 1 | 2 | 3, attendance_pattern: 1,
+        goalie_preference: 3, position_preference: 'Field', created_at: '',
+      })),
+    ];
+    const attendance: AttendanceRecord[] = players.map(p => ({ player_id: p.id, status: 'playing' }));
+    const game = makeGame({
+      num_periods: 4,
+      players_per_period: 4,
+      has_goalie: false,
+      strategy_priorities: ['skill_weighted'],
+    });
+
+    // Over many runs, advanced players should get >= developing players on average
+    let advTotal = 0, devTotal = 0;
+    const runs = 50;
+    for (let run = 0; run < runs; run++) {
+      const lineup = generateLineup(game, players, attendance);
+      const playCount = countPlays(lineup, players);
+      players.forEach(p => {
+        if (p.id.startsWith('adv')) advTotal += playCount[p.id];
+        else devTotal += playCount[p.id];
+      });
+    }
+
+    const advAvg = advTotal / (5 * runs);
+    const devAvg = devTotal / (5 * runs);
+    expect(advAvg).toBeGreaterThanOrEqual(devAvg);
+  });
+
+  it('each period has exactly playersPerPeriod field players', () => {
+    const players = makePlayers(12);
+    const attendance: AttendanceRecord[] = players.map(p => ({ player_id: p.id, status: 'playing' }));
+    const game = makeGame({ players_per_period: 5 });
+
+    const lineup = generateLineup(game, players, attendance);
+    lineup.forEach(period => {
+      expect(period.players.length).toBe(5);
+    });
+  });
+
+  it('late players are included but play fewer periods than on-time players', () => {
+    const players = makePlayers(10);
+    const attendance: AttendanceRecord[] = players.map((p, i) => ({
+      player_id: p.id,
+      status: i < 2 ? 'late' : 'playing', // p1, p2 are late
+    }));
+    const game = makeGame({
+      has_goalie: false,
+      players_per_period: 5,
+      strategy_priorities: ['playing_time_weighted'],
+    });
+
+    let lateTotal = 0, onTimeTotal = 0;
+    const runs = 30;
+    for (let run = 0; run < runs; run++) {
+      const lineup = generateLineup(game, players, attendance);
+      const playCount = countPlays(lineup, players);
+
+      // Late players should still appear
+      expect(playCount['p1']).toBeGreaterThanOrEqual(1);
+      expect(playCount['p2']).toBeGreaterThanOrEqual(1);
+
+      lateTotal += playCount['p1'] + playCount['p2'];
+      for (let i = 3; i <= 10; i++) onTimeTotal += playCount[`p${i}`];
+    }
+
+    const lateAvg = lateTotal / (2 * runs);
+    const onTimeAvg = onTimeTotal / (8 * runs);
+    // Late players should average fewer periods than on-time
+    expect(lateAvg).toBeLessThanOrEqual(onTimeAvg);
+  });
+
+  it('locked players are preserved when regenerating with existing lineup', () => {
+    const players = makePlayers(10);
+    const attendance: AttendanceRecord[] = players.map(p => ({ player_id: p.id, status: 'playing' }));
+    const game = makeGame({ has_goalie: false, players_per_period: 5 });
+
+    // Generate initial lineup
+    const initial = generateLineup(game, players, attendance);
+
+    // Lock p1 in period 1
+    initial[0].players[0] = { ...initial[0].players[0], locked: true };
+    const lockedPlayerId = initial[0].players[0].player_id;
+
+    // Regenerate with locks
+    const regenerated = generateLineup(game, players, attendance, initial);
+
+    // The locked player should still be in period 1
+    const period1Players = regenerated[0].players.map(s => s.player_id);
+    expect(period1Players).toContain(lockedPlayerId);
+
+    // And should be marked as locked
+    const lockedSlot = regenerated[0].players.find(s => s.player_id === lockedPlayerId);
+    expect(lockedSlot?.locked).toBe(true);
+  });
+
+  it('absent players are excluded even when late players are included', () => {
+    const players = makePlayers(8);
+    const attendance: AttendanceRecord[] = [
+      { player_id: 'p1', status: 'playing' },
+      { player_id: 'p2', status: 'late' },
+      { player_id: 'p3', status: 'absent' },
+      { player_id: 'p4', status: 'playing' },
+      { player_id: 'p5', status: 'playing' },
+      { player_id: 'p6', status: 'playing' },
+      { player_id: 'p7', status: 'playing' },
+      { player_id: 'p8', status: 'playing' },
+    ];
+    const game = makeGame({ has_goalie: false, players_per_period: 4 });
+
+    const lineup = generateLineup(game, players, attendance);
+    const allIds = new Set<string>();
+    lineup.forEach(p => p.players.forEach(s => allIds.add(s.player_id)));
+
+    expect(allIds.has('p2')).toBe(true);  // late: included
+    expect(allIds.has('p3')).toBe(false); // absent: excluded
   });
 });

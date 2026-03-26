@@ -1,14 +1,18 @@
 'use client';
 
+import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, Users } from 'lucide-react';
+import { Edit, Trash2, Users, ChevronUp, ChevronDown } from 'lucide-react';
 import type { Player } from '@/lib/database.types';
 
 const skillLabels: Record<number, string> = { 1: 'Strong', 2: 'Average', 3: 'Developing' };
 const attendanceLabels: Record<number, string> = { 1: 'High', 2: 'Medium', 3: 'Low' };
 const goalieLabels: Record<number, string> = { 1: 'Primary', 2: 'Backup', 3: 'No' };
+
+type SortField = 'jersey_number' | 'name' | 'gender' | 'position_preference' | 'skill_level' | 'attendance_pattern' | 'goalie_preference';
+type SortDir = 'asc' | 'desc';
 
 export default function PlayerTable({
   players,
@@ -21,6 +25,46 @@ export default function PlayerTable({
   onEdit: (player: Player) => void;
   onDelete: (id: string) => void;
 }) {
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const sorted = [...players].sort((a, b) => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const av = a[sortField];
+    const bv = b[sortField];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === 'string' && typeof bv === 'string') return av.localeCompare(bv) * dir;
+    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+    return 0;
+  });
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return null;
+    return sortDir === 'asc'
+      ? <ChevronUp className="w-3 h-3 inline ml-0.5" />
+      : <ChevronDown className="w-3 h-3 inline ml-0.5" />;
+  };
+
+  const sortableHead = (label: string, field: SortField) => (
+    <TableHead
+      className="cursor-pointer hover:text-gray-900 select-none"
+      onClick={() => toggleSort(field)}
+    >
+      {label}<SortIcon field={field} />
+    </TableHead>
+  );
+
   if (isLoading) {
     return (
       <div className="bg-white rounded-xl p-8">
@@ -46,18 +90,18 @@ export default function PlayerTable({
       <Table>
         <TableHeader>
           <TableRow className="bg-gray-50">
-            <TableHead>Jersey</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead>Gender</TableHead>
-            <TableHead>Position</TableHead>
-            <TableHead>Skill</TableHead>
-            <TableHead>Attendance</TableHead>
-            <TableHead>Goalie</TableHead>
+            {sortableHead('Jersey', 'jersey_number')}
+            {sortableHead('Name', 'name')}
+            {sortableHead('Gender', 'gender')}
+            {sortableHead('Position', 'position_preference')}
+            {sortableHead('Skill', 'skill_level')}
+            {sortableHead('Attendance', 'attendance_pattern')}
+            {sortableHead('Goalie', 'goalie_preference')}
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {players.map((player) => (
+          {sorted.map((player) => (
             <TableRow key={player.id}>
               <TableCell className="font-medium">{player.jersey_number || '-'}</TableCell>
               <TableCell className="font-medium">{player.name}</TableCell>

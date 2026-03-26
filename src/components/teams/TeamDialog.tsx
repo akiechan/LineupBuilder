@@ -65,7 +65,7 @@ export default function TeamDialog({
             <Label htmlFor="age_group">Age Group</Label>
             <Input id="age_group" placeholder="e.g., U10, U12" value={formData.age_group} onChange={(e) => setFormData({ ...formData, age_group: e.target.value })} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="season">Season</Label>
               <Select value={formData.season} onValueChange={(value) => setFormData({ ...formData, season: value })}>
