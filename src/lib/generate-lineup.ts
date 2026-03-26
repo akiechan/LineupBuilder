@@ -151,16 +151,22 @@ export function generateLineup(
   const periodAssignments: Set<string>[] = Array.from({ length: numPeriods }, () => new Set());
   const lockedSlots: Map<string, Set<number>> = new Map(); // player_id -> set of period indices
 
-  // --- Phase 0: Preserve locked players from existing lineup ---
+  // --- Phase 0: Preserve locked players and goalies from existing lineup ---
+  const lockedGoalies: Map<number, string> = new Map(); // period index -> goalie id
   if (existingLineup) {
     for (let pi = 0; pi < Math.min(existingLineup.length, numPeriods); pi++) {
       const period = existingLineup[pi];
+      // Locked field players
       for (const slot of period.players) {
         if (slot.locked && playingPlayers.some(p => p.id === slot.player_id)) {
           periodAssignments[pi].add(slot.player_id);
           if (!lockedSlots.has(slot.player_id)) lockedSlots.set(slot.player_id, new Set());
           lockedSlots.get(slot.player_id)!.add(pi);
         }
+      }
+      // Locked goalie
+      if (period.goalie_locked && period.goalie && playingPlayers.some(p => p.id === period.goalie)) {
+        lockedGoalies.set(pi, period.goalie);
       }
     }
   }
@@ -169,10 +175,26 @@ export function generateLineup(
   let currentGoalie: Player | null = null;
   let periodsSinceGoalieChange = 0;
   const goalieByPeriod: (string | null)[] = [];
+  const goalieLockedByPeriod: boolean[] = [];
 
   for (let period = 1; period <= numPeriods; period++) {
     if (!hasGoalie) {
       goalieByPeriod.push(null);
+      goalieLockedByPeriod.push(false);
+      continue;
+    }
+
+    const pi = period - 1;
+
+    // If goalie is locked for this period, use that
+    if (lockedGoalies.has(pi)) {
+      const lockedId = lockedGoalies.get(pi)!;
+      const lockedPlayer = playingPlayers.find(p => p.id === lockedId)!;
+      goaliePlayCount[lockedId]++;
+      goalieByPeriod.push(lockedId);
+      goalieLockedByPeriod.push(true);
+      currentGoalie = lockedPlayer;
+      periodsSinceGoalieChange = 1;
       continue;
     }
 
@@ -195,6 +217,7 @@ export function generateLineup(
 
     goaliePlayCount[goalie.id]++;
     goalieByPeriod.push(goalie.id);
+    goalieLockedByPeriod.push(false);
   }
 
   // --- Phase 1: Assign minimum periods to every player ---
@@ -353,6 +376,7 @@ export function generateLineup(
     lineup.push({
       period: pi + 1,
       goalie: goalieId ?? '',
+      goalie_locked: goalieLockedByPeriod[pi] || false,
       players: fieldPlayerIds.map(id => {
         const player = playingPlayers.find(p => p.id === id);
         const isLocked = lockedSlots.get(id)?.has(pi) ?? false;

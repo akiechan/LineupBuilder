@@ -21,6 +21,15 @@ export default function LineupDisplay({
 
   const getPlayerById = (id: string) => players.find(p => p.id === id);
 
+  const toggleGoalieLock = (periodIndex: number) => {
+    const newLineup = lineup.map(p => ({ ...p, players: [...p.players] }));
+    newLineup[periodIndex] = {
+      ...newLineup[periodIndex],
+      goalie_locked: !newLineup[periodIndex].goalie_locked,
+    };
+    onUpdateLineup(newLineup);
+  };
+
   const toggleLock = (periodIndex: number, playerIndex: number) => {
     const newLineup = lineup.map(p => ({ ...p, players: [...p.players] }));
     newLineup[periodIndex].players[playerIndex] = {
@@ -221,16 +230,23 @@ export default function LineupDisplay({
 
                           {/* Goalie */}
                           {period.goalie && (
-                          <div className="mb-3 p-2 bg-blue-50 rounded-lg">
-                            <div className="flex items-center gap-1.5 text-xs font-medium text-blue-900 mb-0.5">
-                              <Shield className="w-3.5 h-3.5" />
-                              Goalie
+                          <div className={`mb-3 p-2 rounded-lg ${period.goalie_locked ? 'bg-yellow-50 border border-yellow-300' : 'bg-blue-50'}`}>
+                            <div className="flex items-center justify-between text-xs font-medium text-blue-900 mb-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <Shield className="w-3.5 h-3.5" />
+                                Goalie
+                              </div>
+                              {editMode && (
+                                <button onClick={() => toggleGoalieLock(periodIndex)} className="p-1.5 hover:bg-blue-100 rounded print:hidden">
+                                  {period.goalie_locked ? <Lock className="w-4 h-4 text-yellow-600" /> : <Unlock className="w-4 h-4 text-gray-400" />}
+                                </button>
+                              )}
                             </div>
                             {editMode ? (
                               <select
                                 value={period.goalie}
                                 onChange={(e) => swapGoalie(periodIndex, e.target.value)}
-                                className="w-full text-sm font-semibold text-blue-900 bg-white border border-blue-200 rounded px-1.5 py-1 print:hidden"
+                                className="w-full text-sm font-semibold text-blue-900 bg-white border border-blue-200 rounded px-1.5 py-1.5 print:hidden"
                               >
                                 {lineupPlayers
                                   .sort((a, b) => a.name.localeCompare(b.name))
@@ -239,9 +255,12 @@ export default function LineupDisplay({
                                   ))}
                               </select>
                             ) : (
-                              <div className="font-semibold text-sm text-blue-900 truncate">
-                                {goalie?.name || 'Unknown'}
-                                {goalie?.jersey_number != null && ` (#${goalie.jersey_number})`}
+                              <div className="flex items-center gap-1.5">
+                                <div className="font-semibold text-sm text-blue-900 truncate flex-1">
+                                  {goalie?.name || 'Unknown'}
+                                  {goalie?.jersey_number != null && ` (#${goalie.jersey_number})`}
+                                </div>
+                                {period.goalie_locked && <Lock className="w-3.5 h-3.5 text-yellow-600 shrink-0" />}
                               </div>
                             )}
                           </div>

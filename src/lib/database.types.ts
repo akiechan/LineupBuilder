@@ -162,5 +162,6 @@ export type LineupPlayerSlot = {
 export type LineupPeriod = {
   period: number;
   goalie: string;
+  goalie_locked?: boolean;
   players: LineupPlayerSlot[];
 };
