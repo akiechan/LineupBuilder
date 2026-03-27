@@ -39,37 +39,9 @@ export default function LineupDisplay({
     onUpdateLineup(newLineup);
   };
 
-  const swapPlayer = (periodIndex: number, playerIndex: number, newPlayerId: string) => {
+  // Direct assignment — no auto-swap. Just place the player in this slot.
+  const assignPlayer = (periodIndex: number, playerIndex: number, newPlayerId: string) => {
     const newLineup = lineup.map(p => ({ ...p, players: [...p.players] }));
-    const oldPlayerId = newLineup[periodIndex].players[playerIndex].player_id;
-    if (oldPlayerId === newPlayerId) return;
-
-    for (let qi = 0; qi < newLineup.length; qi++) {
-      if (newLineup[qi].goalie === newPlayerId) {
-        newLineup[qi].goalie = oldPlayerId;
-        newLineup[periodIndex].players[playerIndex] = {
-          ...newLineup[periodIndex].players[playerIndex],
-          player_id: newPlayerId,
-        };
-        onUpdateLineup(newLineup);
-        return;
-      }
-      for (let pi = 0; pi < newLineup[qi].players.length; pi++) {
-        if (newLineup[qi].players[pi].player_id === newPlayerId) {
-          newLineup[qi].players[pi] = {
-            ...newLineup[qi].players[pi],
-            player_id: oldPlayerId,
-          };
-          newLineup[periodIndex].players[playerIndex] = {
-            ...newLineup[periodIndex].players[playerIndex],
-            player_id: newPlayerId,
-          };
-          onUpdateLineup(newLineup);
-          return;
-        }
-      }
-    }
-
     newLineup[periodIndex].players[playerIndex] = {
       ...newLineup[periodIndex].players[playerIndex],
       player_id: newPlayerId,
@@ -77,31 +49,9 @@ export default function LineupDisplay({
     onUpdateLineup(newLineup);
   };
 
-  const swapGoalie = (periodIndex: number, newGoalieId: string) => {
+  // Direct goalie assignment — no auto-swap.
+  const assignGoalie = (periodIndex: number, newGoalieId: string) => {
     const newLineup = lineup.map(p => ({ ...p, players: [...p.players] }));
-    const oldGoalieId = newLineup[periodIndex].goalie;
-    if (oldGoalieId === newGoalieId) return;
-
-    for (let qi = 0; qi < newLineup.length; qi++) {
-      if (newLineup[qi].goalie === newGoalieId) {
-        newLineup[qi].goalie = oldGoalieId;
-        newLineup[periodIndex].goalie = newGoalieId;
-        onUpdateLineup(newLineup);
-        return;
-      }
-      for (let pi = 0; pi < newLineup[qi].players.length; pi++) {
-        if (newLineup[qi].players[pi].player_id === newGoalieId) {
-          newLineup[qi].players[pi] = {
-            ...newLineup[qi].players[pi],
-            player_id: oldGoalieId,
-          };
-          newLineup[periodIndex].goalie = newGoalieId;
-          onUpdateLineup(newLineup);
-          return;
-        }
-      }
-    }
-
     newLineup[periodIndex].goalie = newGoalieId;
     onUpdateLineup(newLineup);
   };
@@ -157,14 +107,9 @@ export default function LineupDisplay({
       if (a.status === 'playing' || a.status === 'late') availablePlayerIds.add(a.player_id);
     });
   }
-
-  // All players in the lineup (for dropdowns)
-  const allLineupPlayerIds = new Set<string>();
-  lineup.forEach(p => {
-    if (p.goalie) allLineupPlayerIds.add(p.goalie);
-    p.players.forEach(s => allLineupPlayerIds.add(s.player_id));
-  });
-  const lineupPlayers = players.filter(p => allLineupPlayerIds.has(p.id));
+  const availablePlayers = players
+    .filter(p => availablePlayerIds.has(p.id))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const playerLabel = (p: Player) =>
     p.jersey_number != null ? `#${p.jersey_number} ${p.name}` : p.name;
@@ -190,7 +135,7 @@ export default function LineupDisplay({
 
       {editMode && (
         <p className="text-xs text-gray-500 print:hidden">
-          Drag quarters to reorder. Drag players or use dropdowns to swap. Lock players to preserve on regeneration.
+          Use dropdowns to assign any player to any slot. Lock players to preserve on regeneration.
         </p>
       )}
 
@@ -245,14 +190,12 @@ export default function LineupDisplay({
                             {editMode ? (
                               <select
                                 value={period.goalie}
-                                onChange={(e) => swapGoalie(periodIndex, e.target.value)}
+                                onChange={(e) => assignGoalie(periodIndex, e.target.value)}
                                 className="w-full text-sm font-semibold text-blue-900 bg-white border border-blue-200 rounded px-1.5 py-1.5 print:hidden"
                               >
-                                {lineupPlayers
-                                  .sort((a, b) => a.name.localeCompare(b.name))
-                                  .map(p => (
-                                    <option key={p.id} value={p.id}>{playerLabel(p)}</option>
-                                  ))}
+                                {availablePlayers.map(p => (
+                                  <option key={p.id} value={p.id}>{playerLabel(p)}</option>
+                                ))}
                               </select>
                             ) : (
                               <div className="flex items-center gap-1.5">
@@ -260,7 +203,6 @@ export default function LineupDisplay({
                                   {goalie?.name || 'Unknown'}
                                   {goalie?.jersey_number != null && ` (#${goalie.jersey_number})`}
                                 </div>
-                                {period.goalie_locked && editMode && <Lock className="w-3.5 h-3.5 text-yellow-600 shrink-0" />}
                               </div>
                             )}
                           </div>
@@ -280,8 +222,8 @@ export default function LineupDisplay({
                                     const player = getPlayerById(playerSlot.player_id);
                                     return (
                                       <Draggable
-                                        key={`${periodIndex}-${playerSlot.player_id}`}
-                                        draggableId={`${periodIndex}-${playerSlot.player_id}`}
+                                        key={`${periodIndex}-${playerIndex}`}
+                                        draggableId={`${periodIndex}-${playerIndex}`}
                                         index={playerIndex}
                                         isDragDisabled={!editMode || playerSlot.locked}
                                       >
@@ -306,14 +248,12 @@ export default function LineupDisplay({
                                               {editMode ? (
                                                 <select
                                                   value={playerSlot.player_id}
-                                                  onChange={(e) => swapPlayer(periodIndex, playerIndex, e.target.value)}
+                                                  onChange={(e) => assignPlayer(periodIndex, playerIndex, e.target.value)}
                                                   className="flex-1 min-w-0 text-xs font-medium bg-gray-50 border border-gray-200 rounded px-1.5 py-1.5 print:hidden"
                                                 >
-                                                  {lineupPlayers
-                                                    .sort((a, b) => a.name.localeCompare(b.name))
-                                                    .map(p => (
-                                                      <option key={p.id} value={p.id}>{playerLabel(p)}</option>
-                                                    ))}
+                                                  {availablePlayers.map(p => (
+                                                    <option key={p.id} value={p.id}>{playerLabel(p)}</option>
+                                                  ))}
                                                 </select>
                                               ) : (
                                                 <div className="flex-1 min-w-0 truncate text-xs font-medium">
