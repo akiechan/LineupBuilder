@@ -200,7 +200,7 @@ export default function LineupDisplay({
             <div
               ref={qProvided.innerRef}
               {...qProvided.droppableProps}
-              className="grid grid-cols-1 md:grid-cols-4 gap-4"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
             >
               {lineup.map((period, periodIndex) => {
                 const goalie = getPlayerById(period.goalie);

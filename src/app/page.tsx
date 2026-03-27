@@ -34,15 +34,15 @@ export default function TeamsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <Users className="w-8 h-8 text-green-600" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
+              <Users className="w-7 h-7 text-green-600 shrink-0" />
               Game Lineup Builder
             </h1>
-            <p className="text-gray-600 mt-1">Manage your teams and game lineups</p>
+            <p className="text-gray-600 mt-1 text-sm sm:text-base">Manage your teams and game lineups</p>
           </div>
-          <Button onClick={() => setDialogOpen(true)} className="bg-green-600 hover:bg-green-700">
+          <Button onClick={() => setDialogOpen(true)} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">
             <Plus className="w-5 h-5 mr-2" />
             New Team
           </Button>

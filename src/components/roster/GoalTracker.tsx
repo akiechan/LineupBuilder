@@ -105,7 +105,7 @@ export default function GoalTracker({
               {addingPeriod === period && (
                 <div className="border-t pt-2 mt-1 space-y-1">
                   <div className="text-xs text-gray-500 mb-1">Who scored?</div>
-                  <div className="grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto">
+                  <div className="grid grid-cols-2 gap-1.5 max-h-64 overflow-y-auto">
                     {players
                       .sort((a, b) => a.name.localeCompare(b.name))
                       .map(p => (

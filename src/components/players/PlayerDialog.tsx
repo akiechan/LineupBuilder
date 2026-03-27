@@ -77,7 +77,7 @@ export default function PlayerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{player ? 'Edit Player' : 'Add Player'}</DialogTitle>
         </DialogHeader>

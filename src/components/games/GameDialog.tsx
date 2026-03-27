@@ -119,7 +119,7 @@ export default function GameDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{game ? 'Edit Game' : 'New Game'}</DialogTitle>
         </DialogHeader>
@@ -196,24 +196,24 @@ export default function GameDialog({
           </div>
           <div>
             <Label>Skill Distribution</Label>
-            <div className="flex gap-2 mt-2">
+            <div className="grid grid-cols-3 gap-2 mt-2">
               {([
                 { value: 'none', label: 'Off', desc: '' },
-                { value: 'balanced', label: 'Balanced', desc: 'Mix skill levels evenly in each quarter' },
-                { value: 'grouped', label: 'Grouped', desc: 'Cluster similar skill levels together' },
+                { value: 'balanced', label: 'Balanced', desc: 'Even mix per quarter' },
+                { value: 'grouped', label: 'Grouped', desc: 'Similar skills together' },
               ] as const).map(({ value, label, desc }) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setSkillDistribution(value)}
-                  className={`flex-1 p-3 rounded-lg border-2 text-left transition-all ${
+                  className={`p-2 sm:p-3 rounded-lg border-2 text-left transition-all ${
                     skillDistribution === value
                       ? 'border-green-500 bg-green-50 text-green-800'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="font-medium text-sm">{label}</div>
-                  {desc && <div className="text-xs text-gray-500 mt-0.5">{desc}</div>}
+                  <div className="font-medium text-xs sm:text-sm">{label}</div>
+                  {desc && <div className="text-xs text-gray-500 mt-0.5 hidden sm:block">{desc}</div>}
                 </button>
               ))}
             </div>
