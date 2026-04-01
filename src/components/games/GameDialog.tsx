@@ -174,8 +174,9 @@ export default function GameDialog({
             <Label>Weighting Priorities (select and order)</Label>
             <div className="space-y-2 mt-2">
               {['skill_weighted', 'attendance_weighted', 'gender_weighted', 'playing_time_weighted'].map((strategy) => {
-                const isSelected = formData.strategy_priorities.includes(strategy);
-                const priorityIndex = formData.strategy_priorities.indexOf(strategy);
+                const visiblePriorities = formData.strategy_priorities.filter(s => s !== 'skill_grouped' && s !== 'skill_balanced');
+                const isSelected = visiblePriorities.includes(strategy);
+                const priorityIndex = visiblePriorities.indexOf(strategy);
                 return (
                   <div key={strategy} className="flex items-center gap-2 p-2 border rounded">
                     <Checkbox id={strategy} checked={isSelected} onCheckedChange={() => toggleStrategy(strategy)} />

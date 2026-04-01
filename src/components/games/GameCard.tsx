@@ -56,7 +56,7 @@ export default function GameCard({
         <div className="space-y-2 text-sm text-gray-600 mb-4">
           <div>{game.num_periods || 4} periods</div>
           {game.strategy_priorities && game.strategy_priorities.length > 0 && (
-            <div>Priority: {game.strategy_priorities.map(s => strategyLabels[s]).join(' > ')}</div>
+            <div>Priority: {game.strategy_priorities.filter(s => s !== 'skill_grouped' && s !== 'skill_balanced').map(s => strategyLabels[s]).filter(Boolean).join(' > ')}</div>
           )}
           {game.score_us != null && game.score_opponent != null && (
             <div className="font-semibold text-base">

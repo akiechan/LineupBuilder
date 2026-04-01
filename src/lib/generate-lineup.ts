@@ -44,9 +44,12 @@ export function generateLineup(
   }
 
   // --- Strategy weights from user priority order ---
-  const enabledCount = strategies.length;
+  // Skill distribution modes are stored in the same array but are NOT priorities
+  const skillDistEntries = ['skill_grouped', 'skill_balanced'];
+  const actualPriorities = strategies.filter(s => !skillDistEntries.includes(s));
+  const enabledCount = actualPriorities.length;
   const strategyWeight = (name: string): number => {
-    const rank = strategies.indexOf(name);
+    const rank = actualPriorities.indexOf(name);
     if (rank === -1) return 0;
     return 3 * (enabledCount - rank) / enabledCount;
   };
@@ -54,7 +57,7 @@ export function generateLineup(
   const W_skill = strategyWeight('skill_weighted');
   const W_att = strategyWeight('attendance_weighted');
   const W_fair = strategyWeight('playing_time_weighted');
-  const genderEnabled = strategies.includes('gender_weighted');
+  const genderEnabled = actualPriorities.includes('gender_weighted');
   const skillDistMode = strategies.includes('skill_grouped') ? 'grouped'
     : strategies.includes('skill_balanced') ? 'balanced'
     : 'none';
@@ -174,6 +177,13 @@ export function generateLineup(
     }
   }
 
+  // Late players cannot play before their arrival period
+  const isPeriodAllowed = (playerId: string, pi: number) => {
+    if (!latePlayerIds.has(playerId)) return true;
+    const arrivesPeriod = lateArrivesPeriod[playerId] ?? 2; // 1-indexed period
+    return (pi + 1) >= arrivesPeriod; // pi is 0-indexed
+  };
+
   // --- Goalie assignment (counts toward play time) ---
   let currentGoalie: Player | null = null;
   let periodsSinceGoalieChange = 0;
@@ -201,19 +211,28 @@ export function generateLineup(
       continue;
     }
 
+    // Filter out late players who haven't arrived yet
+    const periodEligibleGoalies = eligibleGoalies.filter(g => isPeriodAllowed(g.id, pi));
+
     let goalie: Player;
-    if (currentGoalie && periodsSinceGoalieChange < goalieRotation) {
+    if (currentGoalie && periodsSinceGoalieChange < goalieRotation && isPeriodAllowed(currentGoalie.id, pi)) {
       goalie = currentGoalie;
       periodsSinceGoalieChange++;
     } else {
-      const sortedGoalies = [...eligibleGoalies].sort((a, b) => {
+      const sortedGoalies = [...periodEligibleGoalies].sort((a, b) => {
         const goalieDiff = goaliePlayCount[a.id] - goaliePlayCount[b.id];
         if (goalieDiff !== 0) return goalieDiff;
         const playDiff = getEffectivePlayCount(a.id) - getEffectivePlayCount(b.id);
         if (playDiff !== 0) return playDiff;
         return (a.goalie_preference + Math.random()) - (b.goalie_preference + Math.random());
       });
-      goalie = sortedGoalies.find(g => g.id !== currentGoalie?.id) || sortedGoalies[0];
+      if (sortedGoalies.length === 0) {
+        // All eligible goalies are late — fall back to any available player
+        const fallback = playingPlayers.filter(p => isPeriodAllowed(p.id, pi));
+        goalie = fallback[0] || playingPlayers[0]; // absolute fallback
+      } else {
+        goalie = sortedGoalies.find(g => g.id !== currentGoalie?.id) || sortedGoalies[0];
+      }
       currentGoalie = goalie;
       periodsSinceGoalieChange = 1;
     }
@@ -239,13 +258,6 @@ export function generateLineup(
       return Math.max(1, Math.min(baseMin - 1, availablePeriods));
     }
     return baseMin;
-  };
-
-  // Late players cannot play before their arrival period
-  const isPeriodAllowed = (playerId: string, pi: number) => {
-    if (!latePlayerIds.has(playerId)) return true;
-    const arrivesPeriod = lateArrivesPeriod[playerId] ?? 2; // 1-indexed period
-    return (pi + 1) >= arrivesPeriod; // pi is 0-indexed
   };
 
   // Verify feasibility
@@ -327,7 +339,7 @@ export function generateLineup(
   if (genderEnabled) {
     const totalFemale = playingPlayers.filter(p => p.gender === 'Female').length;
     const targetFemalePerPeriod = Math.round((totalFemale / totalAttending) * playersPerPeriod);
-    const fairPlayIsFirst = strategies[0] === 'playing_time_weighted';
+    const fairPlayIsFirst = actualPriorities[0] === 'playing_time_weighted';
 
     for (let pi = 0; pi < numPeriods; pi++) {
       const assigned = [...periodAssignments[pi]];
