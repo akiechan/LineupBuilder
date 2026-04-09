@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Shield, Lock, Unlock, GripVertical, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Shield, Lock, Unlock, GripVertical, X } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import type { Player, LineupPeriod, AttendanceRecord } from '@/lib/database.types';
 
@@ -18,6 +18,7 @@ export default function LineupDisplay({
   onUpdateLineup: (lineup: LineupPeriod[]) => void;
 }) {
   const [editMode, setEditMode] = useState(false);
+  const [selectedQuarter, setSelectedQuarter] = useState<number | null>(null);
 
   const getPlayerById = (id: string) => players.find(p => p.id === id);
 
@@ -56,13 +57,18 @@ export default function LineupDisplay({
     onUpdateLineup(newLineup);
   };
 
-  const moveQuarter = (from: number, to: number) => {
-    if (to < 0 || to >= lineup.length) return;
-    const newLineup = lineup.map(p => ({ ...p, players: [...p.players] }));
-    const [moved] = newLineup.splice(from, 1);
-    newLineup.splice(to, 0, moved);
-    newLineup.forEach((p, i) => { p.period = i + 1; });
-    onUpdateLineup(newLineup);
+  const handleQuarterTap = (index: number) => {
+    if (selectedQuarter === null) {
+      setSelectedQuarter(index);
+    } else if (selectedQuarter === index) {
+      setSelectedQuarter(null);
+    } else {
+      const newLineup = lineup.map(p => ({ ...p, players: [...p.players] }));
+      [newLineup[selectedQuarter], newLineup[index]] = [newLineup[index], newLineup[selectedQuarter]];
+      newLineup.forEach((p, i) => { p.period = i + 1; });
+      onUpdateLineup(newLineup);
+      setSelectedQuarter(null);
+    }
   };
 
   const onDragEnd = (result: DropResult) => {
@@ -127,15 +133,40 @@ export default function LineupDisplay({
     <div className="space-y-4">
       <div className="flex justify-between items-center print:hidden">
         <h2 className="text-xl font-bold">Generated Lineup</h2>
-        <button onClick={() => setEditMode(!editMode)} className="text-sm text-blue-600 hover:text-blue-700">
+        <button onClick={() => { setEditMode(!editMode); setSelectedQuarter(null); }} className="text-sm text-blue-600 hover:text-blue-700">
           {editMode ? 'Done Editing' : 'Edit Lineup'}
         </button>
       </div>
 
       {editMode && (
-        <p className="text-xs text-gray-500 print:hidden">
-          Use dropdowns to assign any player to any slot. Lock players to preserve on regeneration.
-        </p>
+        <div className="print:hidden space-y-3">
+          <p className="text-xs text-gray-500">
+            Use dropdowns to assign any player to any slot. Lock players to preserve on regeneration.
+          </p>
+          {/* Quarter reorder bar */}
+          <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+            <p className="text-xs text-gray-500 mb-2 text-center">
+              {selectedQuarter === null ? 'Tap a quarter to reorder it' : `Q${lineup[selectedQuarter].period} selected — tap another quarter to swap`}
+            </p>
+            <div className="flex gap-2">
+              {lineup.map((period, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleQuarterTap(i)}
+                  className={`flex-1 py-3 rounded-lg border-2 font-bold text-sm transition-all touch-manipulation select-none ${
+                    selectedQuarter === i
+                      ? 'bg-green-600 text-white border-green-600 shadow-md'
+                      : selectedQuarter !== null
+                      ? 'bg-white text-green-700 border-green-300 hover:border-green-500 hover:bg-green-50'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-green-400'
+                  }`}
+                >
+                  Q{period.period}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       <DragDropContext onDragEnd={onDragEnd}>
@@ -146,29 +177,10 @@ export default function LineupDisplay({
             return (
               <Card key={`quarter-${periodIndex}`} className="print:break-inside-avoid">
                 <CardContent className="pt-4 px-3">
-                  {/* Quarter header with arrow reorder buttons */}
-                  <div className="flex items-center justify-center gap-1 mb-3">
-                    {editMode && (
-                      <button
-                        onClick={() => moveQuarter(periodIndex, periodIndex - 1)}
-                        disabled={periodIndex === 0}
-                        className="p-1.5 rounded hover:bg-green-50 disabled:opacity-20 disabled:cursor-not-allowed touch-manipulation"
-                        aria-label="Move quarter earlier"
-                      >
-                        <ChevronLeft className="w-4 h-4 text-green-600" />
-                      </button>
-                    )}
-                    <h3 className="font-bold text-sm text-green-700 px-1">Q{period.period}</h3>
-                    {editMode && (
-                      <button
-                        onClick={() => moveQuarter(periodIndex, periodIndex + 1)}
-                        disabled={periodIndex === lineup.length - 1}
-                        className="p-1.5 rounded hover:bg-green-50 disabled:opacity-20 disabled:cursor-not-allowed touch-manipulation"
-                        aria-label="Move quarter later"
-                      >
-                        <ChevronRight className="w-4 h-4 text-green-600" />
-                      </button>
-                    )}
+                  <div className="flex items-center justify-center mb-3">
+                    <h3 className={`font-bold text-sm px-1 ${selectedQuarter === periodIndex ? 'text-green-600' : 'text-green-700'}`}>
+                      Q{period.period}
+                    </h3>
                   </div>
 
                           {/* Goalie */}
