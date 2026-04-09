@@ -59,7 +59,7 @@ export default function TeamCard({
             <Button variant="outline" className="w-full">Manage Players</Button>
           </Link>
           <Link href={`/teams/${team.id}/games`} className="flex-1">
-            <Button className="w-full bg-green-600 hover:bg-green-700">Games</Button>
+            <Button className="w-full bg-slate-800 hover:bg-slate-900">Games</Button>
           </Link>
         </div>
       </CardContent>

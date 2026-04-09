@@ -29,6 +29,7 @@ export function generateLineup(
   const hasGoalie = game.has_goalie ?? true;
   const goalieRotation = game.goalie_rotation_periods || 1;
   const countGoalieTime = game.count_goalie_as_playing_time ?? true;
+  const avoidConsecutiveBench = game.avoid_consecutive_bench ?? false;
   const strategies = game.strategy_priorities || [];
 
   const totalAttending = playingPlayers.length;
@@ -380,6 +381,49 @@ export function generateLineup(
           periodAssignments[pi].add(benchGirls[i].id);
           assignedCount[swappableBoys[i]]--;
           assignedCount[benchGirls[i].id]++;
+        }
+      }
+    }
+  }
+
+  // --- Avoid consecutive bench pass ---
+  // If enabled, find players benched in two consecutive periods and swap them in.
+  if (avoidConsecutiveBench && numPeriods >= 2) {
+    for (let pi = 1; pi < numPeriods; pi++) {
+      const prevActive = new Set([...periodAssignments[pi - 1]]);
+      if (goalieByPeriod[pi - 1]) prevActive.add(goalieByPeriod[pi - 1]!);
+      const currActive = new Set([...periodAssignments[pi]]);
+      if (goalieByPeriod[pi]) currActive.add(goalieByPeriod[pi]!);
+
+      // Find players benched in BOTH pi-1 and pi
+      const availableIds = new Set<string>();
+      playingPlayers.forEach(p => {
+        if (isPeriodAllowed(p.id, pi - 1) || isPeriodAllowed(p.id, pi)) {
+          availableIds.add(p.id);
+        }
+      });
+
+      for (const p of playingPlayers) {
+        if (!isPeriodAllowed(p.id, pi)) continue;
+        if (prevActive.has(p.id) || currActive.has(p.id)) continue;
+        // p is benched in both pi-1 and pi — try to swap them into pi
+        if (periodAssignments[pi].size >= playersPerPeriod) {
+          // Find someone in pi who played in pi-1 and can be swapped out
+          const swapCandidate = [...periodAssignments[pi]].find(id => {
+            if (lockedSlots.get(id)?.has(pi)) return false;
+            if (prevActive.has(id) && assignedCount[id] > effectiveMin) return true;
+            return false;
+          });
+          if (swapCandidate) {
+            periodAssignments[pi].delete(swapCandidate);
+            periodAssignments[pi].add(p.id);
+            assignedCount[swapCandidate]--;
+            assignedCount[p.id]++;
+          }
+        } else {
+          // Open slot — just add them
+          periodAssignments[pi].add(p.id);
+          assignedCount[p.id]++;
         }
       }
     }

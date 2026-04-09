@@ -29,6 +29,7 @@ export default function GameDialog({
     has_goalie: true,
     goalie_rotation_periods: 1,
     count_goalie_as_playing_time: true,
+    avoid_consecutive_bench: false,
     strategy_priorities: [] as string[],
   });
 
@@ -46,6 +47,7 @@ export default function GameDialog({
         has_goalie: game.has_goalie ?? true,
         goalie_rotation_periods: game.goalie_rotation_periods || 1,
         count_goalie_as_playing_time: game.count_goalie_as_playing_time ?? true,
+        avoid_consecutive_bench: game.avoid_consecutive_bench ?? false,
         strategy_priorities: game.strategy_priorities || [],
       });
     } else {
@@ -58,6 +60,7 @@ export default function GameDialog({
         has_goalie: true,
         goalie_rotation_periods: 1,
         count_goalie_as_playing_time: true,
+        avoid_consecutive_bench: false,
         strategy_priorities: [],
       });
     }
@@ -170,6 +173,16 @@ export default function GameDialog({
               </label>
             </div>
           )}
+          <div className="flex items-center gap-2 p-3 border rounded">
+            <Checkbox
+              id="avoid_bench"
+              checked={formData.avoid_consecutive_bench}
+              onCheckedChange={(checked) => setFormData({ ...formData, avoid_consecutive_bench: checked as boolean })}
+            />
+            <label htmlFor="avoid_bench" className="text-sm cursor-pointer">
+              Avoid consecutive bench (no player sits out two quarters in a row)
+            </label>
+          </div>
           <div>
             <Label>Weighting Priorities (select and order)</Label>
             <div className="space-y-2 mt-2">

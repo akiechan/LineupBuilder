@@ -28,6 +28,7 @@ function makeGame(overrides?: Partial<Game>): Game {
     goalie_rotation_periods: 1,
     count_goalie_as_playing_time: true,
     has_goalie: true,
+    avoid_consecutive_bench: false,
     strategy_priorities: ['playing_time_weighted'],
     attendance: [],
     lineup: null,
