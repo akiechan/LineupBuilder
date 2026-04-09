@@ -32,6 +32,7 @@ export default function GamesPage() {
       goalie_rotation_periods: game.goalie_rotation_periods,
       count_goalie_as_playing_time: game.count_goalie_as_playing_time,
       avoid_consecutive_bench: game.avoid_consecutive_bench,
+      goalie_counts_as_bench: game.goalie_counts_as_bench,
       strategy_priorities: game.strategy_priorities,
     });
   };
