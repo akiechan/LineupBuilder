@@ -30,6 +30,7 @@ export default function GameDialog({
     goalie_rotation_periods: 1,
     count_goalie_as_playing_time: true,
     avoid_consecutive_bench: false,
+    goalie_counts_as_bench: false,
     strategy_priorities: [] as string[],
   });
 
@@ -48,6 +49,7 @@ export default function GameDialog({
         goalie_rotation_periods: game.goalie_rotation_periods || 1,
         count_goalie_as_playing_time: game.count_goalie_as_playing_time ?? true,
         avoid_consecutive_bench: game.avoid_consecutive_bench ?? false,
+        goalie_counts_as_bench: game.goalie_counts_as_bench ?? false,
         strategy_priorities: game.strategy_priorities || [],
       });
     } else {
@@ -61,6 +63,7 @@ export default function GameDialog({
         goalie_rotation_periods: 1,
         count_goalie_as_playing_time: true,
         avoid_consecutive_bench: false,
+        goalie_counts_as_bench: false,
         strategy_priorities: [],
       });
     }
@@ -162,7 +165,7 @@ export default function GameDialog({
             </label>
           </div>
           {formData.has_goalie && (
-            <div className="flex items-center gap-2 p-3 border rounded ml-4">
+            <div className="flex items-center gap-2 p-3 border rounded">
               <Checkbox
                 id="count_goalie"
                 checked={formData.count_goalie_as_playing_time}
@@ -183,6 +186,18 @@ export default function GameDialog({
               Avoid consecutive bench (no player sits out two quarters in a row)
             </label>
           </div>
+          {formData.has_goalie && formData.avoid_consecutive_bench && (
+            <div className="flex items-center gap-2 p-3 border rounded ml-4">
+              <Checkbox
+                id="goalie_counts_as_bench"
+                checked={formData.goalie_counts_as_bench}
+                onCheckedChange={(checked) => setFormData({ ...formData, goalie_counts_as_bench: checked as boolean })}
+              />
+              <label htmlFor="goalie_counts_as_bench" className="text-sm cursor-pointer">
+                Goalie counts as bench (player who plays goalie then sits out is treated as consecutively benched)
+              </label>
+            </div>
+          )}
           <div>
             <Label>Weighting Priorities (select and order)</Label>
             <div className="space-y-2 mt-2">

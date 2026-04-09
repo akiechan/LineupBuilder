@@ -30,6 +30,7 @@ export function generateLineup(
   const goalieRotation = game.goalie_rotation_periods || 1;
   const countGoalieTime = game.count_goalie_as_playing_time ?? true;
   const avoidConsecutiveBench = game.avoid_consecutive_bench ?? false;
+  const goalieCountsAsBench = game.goalie_counts_as_bench ?? false;
   const strategies = game.strategy_priorities || [];
 
   const totalAttending = playingPlayers.length;
@@ -388,33 +389,48 @@ export function generateLineup(
 
   // --- Avoid consecutive bench pass ---
   // If enabled, find players benched in two consecutive periods and swap them in.
+  // When goalieCountsAsBench is false (default), a player in the goalie slot is
+  // considered "active" and does not need consecutive-bench protection.
+  // When goalieCountsAsBench is true, goalie = bench for the PREVIOUS period check,
+  // so a player who plays goalie then sits out the next period is treated as benched twice.
+  // The CURRENT period's goalie is always "placed" regardless — they already have a slot
+  // and should not be double-assigned to the field.
   if (avoidConsecutiveBench && numPeriods >= 2) {
-    for (let pi = 1; pi < numPeriods; pi++) {
-      const prevActive = new Set([...periodAssignments[pi - 1]]);
-      if (goalieByPeriod[pi - 1]) prevActive.add(goalieByPeriod[pi - 1]!);
-      const currActive = new Set([...periodAssignments[pi]]);
-      if (goalieByPeriod[pi]) currActive.add(goalieByPeriod[pi]!);
+    const isActiveInPeriod = (playerId: string, periodIdx: number, isCurrentPeriod: boolean): boolean => {
+      if (periodAssignments[periodIdx].has(playerId)) return true;
+      if (goalieByPeriod[periodIdx] === playerId) {
+        // Current period's goalie always has a slot — never double-assign to field.
+        // Previous period's goalie counts as "active" only when goalieCountsAsBench is false.
+        return isCurrentPeriod || !goalieCountsAsBench;
+      }
+      return false;
+    };
 
-      // Find players benched in BOTH pi-1 and pi
-      const availableIds = new Set<string>();
-      playingPlayers.forEach(p => {
-        if (isPeriodAllowed(p.id, pi - 1) || isPeriodAllowed(p.id, pi)) {
-          availableIds.add(p.id);
-        }
-      });
+    for (let pi = 1; pi < numPeriods; pi++) {
+      // Build the set of players considered "active" in the previous period,
+      // used to identify good swap-out candidates (swapping out someone who was
+      // active in pi-1 avoids creating a new consecutive-bench situation for them).
+      const prevActive = new Set<string>();
+      periodAssignments[pi - 1].forEach(id => prevActive.add(id));
+      if (!goalieCountsAsBench && goalieByPeriod[pi - 1]) prevActive.add(goalieByPeriod[pi - 1]!);
 
       for (const p of playingPlayers) {
         if (!isPeriodAllowed(p.id, pi)) continue;
-        if (prevActive.has(p.id) || currActive.has(p.id)) continue;
-        // p is benched in both pi-1 and pi — try to swap them into pi
+        if (isActiveInPeriod(p.id, pi - 1, false) || isActiveInPeriod(p.id, pi, true)) continue;
+        // p is benched in both pi-1 and pi — try to swap them into pi as a field player
         if (periodAssignments[pi].size >= playersPerPeriod) {
-          // Find someone in pi who played in pi-1 and can be swapped out
-          const swapCandidate = [...periodAssignments[pi]].find(id => {
-            if (lockedSlots.get(id)?.has(pi)) return false;
-            if (prevActive.has(id) && assignedCount[id] > effectiveMin) return true;
-            return false;
-          });
-          if (swapCandidate) {
+          // Prefer swapping out someone who WAS active in pi-1 — that way being benched
+          // in pi doesn't create a new consecutive bench for them. Among those, pick the
+          // one with the most assigned time.
+          const swapCandidate = [...periodAssignments[pi]]
+            .filter(id => !lockedSlots.get(id)?.has(pi))
+            .sort((a, b) => {
+              const aWasPrev = prevActive.has(a) ? 1 : 0;
+              const bWasPrev = prevActive.has(b) ? 1 : 0;
+              if (aWasPrev !== bWasPrev) return bWasPrev - aWasPrev; // prev-active first
+              return assignedCount[b] - assignedCount[a]; // most plays first
+            })[0];
+          if (swapCandidate !== undefined) {
             periodAssignments[pi].delete(swapCandidate);
             periodAssignments[pi].add(p.id);
             assignedCount[swapCandidate]--;

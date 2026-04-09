@@ -49,6 +49,7 @@ const initPromise = db.batch([
   db.execute(`ALTER TABLE games ADD COLUMN notes TEXT`).catch(() => {}),
   db.execute(`ALTER TABLE games ADD COLUMN goals TEXT DEFAULT '[]'`).catch(() => {}),
   db.execute(`ALTER TABLE games ADD COLUMN avoid_consecutive_bench INTEGER DEFAULT 0`).catch(() => {}),
+  db.execute(`ALTER TABLE games ADD COLUMN goalie_counts_as_bench INTEGER DEFAULT 0`).catch(() => {}),
 ]));
 
 export { initPromise };

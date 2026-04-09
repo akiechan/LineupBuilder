@@ -77,6 +77,7 @@ export interface Database {
           count_goalie_as_playing_time: boolean;
           has_goalie: boolean;
           avoid_consecutive_bench: boolean;
+          goalie_counts_as_bench: boolean;
           strategy_priorities: string[];
           attendance: Json;
           lineup: Json;
@@ -98,6 +99,7 @@ export interface Database {
           count_goalie_as_playing_time?: boolean;
           has_goalie?: boolean;
           avoid_consecutive_bench?: boolean;
+          goalie_counts_as_bench?: boolean;
           strategy_priorities?: string[];
           attendance?: Json;
           lineup?: Json;
@@ -118,6 +120,7 @@ export interface Database {
           count_goalie_as_playing_time?: boolean;
           has_goalie?: boolean;
           avoid_consecutive_bench?: boolean;
+          goalie_counts_as_bench?: boolean;
           strategy_priorities?: string[];
           attendance?: Json;
           lineup?: Json;
