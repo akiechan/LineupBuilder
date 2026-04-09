@@ -7,7 +7,7 @@ import { useTeam } from '@/hooks/use-teams';
 import { usePlayers } from '@/hooks/use-players';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { ArrowLeft, RefreshCw, Printer } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Printer, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import AttendanceSection from '@/components/roster/AttendanceSection';
@@ -120,6 +120,68 @@ export default function GameRosterPage() {
     }
   };
 
+  const [shareMode, setShareMode] = useState<'landscape' | 'portrait' | null>(null);
+
+  const getPlayerName = (id: string) => {
+    const p = allPlayers.find(pl => pl.id === id);
+    return p ? (p.jersey_number != null ? `#${p.jersey_number} ${p.name}` : p.name) : 'Unknown';
+  };
+
+  const generateShareText = (orientation: 'landscape' | 'portrait') => {
+    if (!game || !game.lineup) return '';
+    const gameLineup = game.lineup as LineupPeriod[];
+    const header = `${team?.name || 'Team'} - ${game.opponent ? `vs ${game.opponent}` : 'Game Day'}\n${format(new Date(game.game_date + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}\n`;
+
+    if (orientation === 'landscape') {
+      // Side-by-side quarters
+      const maxPlayers = Math.max(...gameLineup.map(p => p.players.length));
+      let text = header + '\n';
+      text += gameLineup.map(p => `Q${p.period}`.padEnd(20)).join('') + '\n';
+      text += gameLineup.map(() => '─'.repeat(18) + '  ').join('') + '\n';
+      // Goalies
+      if (gameLineup.some(p => p.goalie)) {
+        text += gameLineup.map(p => p.goalie ? `🧤 ${getPlayerName(p.goalie)}`.padEnd(20) : ''.padEnd(20)).join('') + '\n';
+      }
+      // Field players row by row
+      for (let i = 0; i < maxPlayers; i++) {
+        text += gameLineup.map(p => {
+          const slot = p.players[i];
+          return slot ? getPlayerName(slot.player_id).padEnd(20) : ''.padEnd(20);
+        }).join('') + '\n';
+      }
+      return text.trimEnd();
+    } else {
+      // Stacked quarters
+      let text = header;
+      for (const period of gameLineup) {
+        text += `\n── Q${period.period} ──\n`;
+        if (period.goalie) text += `🧤 ${getPlayerName(period.goalie)}\n`;
+        period.players.forEach(s => { text += `  ${getPlayerName(s.player_id)}\n`; });
+      }
+      return text.trimEnd();
+    }
+  };
+
+  const handleShare = async (orientation: 'landscape' | 'portrait') => {
+    const text = generateShareText(orientation);
+    setShareMode(null);
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `${team?.name} Lineup`, text });
+        return;
+      } catch { /* user cancelled or not supported */ }
+    }
+    // Fallback: copy to clipboard
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('Lineup copied to clipboard!');
+    } catch {
+      // Final fallback: prompt
+      prompt('Copy lineup:', text);
+    }
+  };
+
   if (gameLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-6 flex items-center justify-center">
@@ -189,10 +251,34 @@ export default function GameRosterPage() {
                 {lineup ? 'Regenerate Lineup' : 'Generate Lineup'}
               </Button>
               {lineup && (
-                <Button onClick={() => window.print()} variant="outline" className="gap-2">
-                  <Printer className="w-4 h-4" />
-                  Print
-                </Button>
+                <>
+                  <Button onClick={() => window.print()} variant="outline" className="gap-2">
+                    <Printer className="w-4 h-4" />
+                    Print
+                  </Button>
+                  <div className="relative">
+                    <Button onClick={() => setShareMode(shareMode ? null : 'landscape')} variant="outline" className="gap-2">
+                      <Share2 className="w-4 h-4" />
+                      Share
+                    </Button>
+                    {shareMode !== null && (
+                      <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg p-2 z-10 min-w-[160px]">
+                        <button
+                          onClick={() => handleShare('landscape')}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 rounded"
+                        >
+                          📐 Landscape (side-by-side)
+                        </button>
+                        <button
+                          onClick={() => handleShare('portrait')}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 rounded"
+                        >
+                          📋 Portrait (stacked)
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           </div>
