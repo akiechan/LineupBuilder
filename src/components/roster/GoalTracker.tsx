@@ -87,7 +87,7 @@ export default function GoalTracker({
                       }`}
                     >
                       <span>
-                        {goal.scorer_id ? '\u26BD' : '\u26BD'}{' '}
+                        {goal.scorer_id ? '⚽' : '↙'}{' '}
                         {goal.scorer_name}
                       </span>
                       <button onClick={() => removeGoal(goal.id)} className="p-1.5 hover:bg-white/50 rounded -mr-1">

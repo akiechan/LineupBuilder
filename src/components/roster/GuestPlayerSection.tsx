@@ -42,8 +42,8 @@ export default function GuestPlayerSection({
     onUpdate(guests.filter(g => g.id !== id));
   };
 
-  const skillLabels = ['', 'Beginner', 'Mid', 'Advanced'];
-  const goalieLabels = ['', 'Wants to', 'Willing', 'No'];
+  const skillLabels = ['', 'Strong', 'Average', 'Developing'];
+  const goalieLabels = ['', 'Primary', 'Backup', 'No'];
 
   const ToggleGroup = ({
     label,

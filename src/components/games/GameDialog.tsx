@@ -125,7 +125,7 @@ export default function GameDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>{game ? 'Edit Game' : 'New Game'}</DialogTitle>
         </DialogHeader>
@@ -215,7 +215,7 @@ export default function GameDialog({
                     {isSelected && (
                       <div className="flex gap-1">
                         <Button type="button" variant="ghost" size="sm" onClick={() => moveStrategyUp(strategy)} disabled={priorityIndex === 0} className="h-7 px-2">&#8593;</Button>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => moveStrategyDown(strategy)} disabled={priorityIndex === formData.strategy_priorities.length - 1} className="h-7 px-2">&#8595;</Button>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => moveStrategyDown(strategy)} disabled={priorityIndex === visiblePriorities.length - 1} className="h-7 px-2">&#8595;</Button>
                       </div>
                     )}
                   </div>

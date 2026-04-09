@@ -206,6 +206,32 @@ export default function GameRosterPage() {
           </div>
 
           <div className="bg-white rounded-xl p-4 sm:p-6 print:hidden">
+            {/* Active settings summary */}
+            {(() => {
+              const chips: string[] = [];
+              const visibleStrategies = (game.strategy_priorities || []).filter(
+                s => s !== 'skill_grouped' && s !== 'skill_balanced'
+              );
+              const strategyLabels: Record<string, string> = {
+                skill_weighted: 'Skill',
+                attendance_weighted: 'Attendance',
+                gender_weighted: 'Gender',
+                playing_time_weighted: 'Equal Time',
+              };
+              if (visibleStrategies.length > 0) {
+                chips.push(visibleStrategies.map(s => strategyLabels[s] || s).join(' > '));
+              }
+              if (game.avoid_consecutive_bench) chips.push('No consecutive bench');
+              if (game.goalie_counts_as_bench) chips.push('Goalie = bench');
+              if (!game.count_goalie_as_playing_time) chips.push('Goalie time not counted');
+              return chips.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {chips.map((chip, i) => (
+                    <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">{chip}</span>
+                  ))}
+                </div>
+              ) : null;
+            })()}
             <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
               <Button
                 onClick={handleGenerateLineup}
