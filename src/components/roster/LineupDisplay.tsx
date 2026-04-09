@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Shield, Lock, Unlock, GripVertical, X } from 'lucide-react';
+import { Shield, Lock, Unlock, GripVertical, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import type { Player, LineupPeriod, AttendanceRecord } from '@/lib/database.types';
 
@@ -56,19 +56,18 @@ export default function LineupDisplay({
     onUpdateLineup(newLineup);
   };
 
-  const onDragEnd = (result: DropResult) => {
-    const { source, destination, type } = result;
-    if (!destination) return;
+  const moveQuarter = (from: number, to: number) => {
+    if (to < 0 || to >= lineup.length) return;
+    const newLineup = lineup.map(p => ({ ...p, players: [...p.players] }));
+    const [moved] = newLineup.splice(from, 1);
+    newLineup.splice(to, 0, moved);
+    newLineup.forEach((p, i) => { p.period = i + 1; });
+    onUpdateLineup(newLineup);
+  };
 
-    if (type === 'quarter') {
-      if (source.index === destination.index) return;
-      const newLineup = lineup.map(p => ({ ...p, players: [...p.players] }));
-      const [moved] = newLineup.splice(source.index, 1);
-      newLineup.splice(destination.index, 0, moved);
-      newLineup.forEach((p, i) => { p.period = i + 1; });
-      onUpdateLineup(newLineup);
-      return;
-    }
+  const onDragEnd = (result: DropResult) => {
+    const { source, destination } = result;
+    if (!destination) return;
 
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
@@ -140,38 +139,37 @@ export default function LineupDisplay({
       )}
 
       <DragDropContext onDragEnd={onDragEnd}>
-        <Droppable droppableId="quarters" type="quarter" direction="horizontal">
-          {(qProvided) => (
-            <div
-              ref={qProvided.innerRef}
-              {...qProvided.droppableProps}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
-            >
-              {lineup.map((period, periodIndex) => {
-                const goalie = getPlayerById(period.goalie);
-                const bench = getBenchPlayers(period);
-                return (
-                  <Draggable
-                    key={`quarter-${periodIndex}`}
-                    draggableId={`quarter-${periodIndex}`}
-                    index={periodIndex}
-                    isDragDisabled={!editMode}
-                  >
-                    {(qDragProvided, qSnapshot) => (
-                      <Card
-                        ref={qDragProvided.innerRef}
-                        {...qDragProvided.draggableProps}
-                        className={`print:break-inside-avoid ${qSnapshot.isDragging ? 'shadow-xl ring-2 ring-green-300' : ''}`}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {lineup.map((period, periodIndex) => {
+            const goalie = getPlayerById(period.goalie);
+            const bench = getBenchPlayers(period);
+            return (
+              <Card key={`quarter-${periodIndex}`} className="print:break-inside-avoid">
+                <CardContent className="pt-4 px-3">
+                  {/* Quarter header with arrow reorder buttons */}
+                  <div className="flex items-center justify-center gap-1 mb-3">
+                    {editMode && (
+                      <button
+                        onClick={() => moveQuarter(periodIndex, periodIndex - 1)}
+                        disabled={periodIndex === 0}
+                        className="p-1.5 rounded hover:bg-green-50 disabled:opacity-20 disabled:cursor-not-allowed touch-manipulation"
+                        aria-label="Move quarter earlier"
                       >
-                        <CardContent className="pt-4 px-3">
-                          {/* Quarter header - drag handle */}
-                          <div
-                            {...qDragProvided.dragHandleProps}
-                            className={`flex items-center justify-center gap-1 mb-3 rounded py-1 ${editMode ? 'cursor-grab active:cursor-grabbing hover:bg-green-50' : ''}`}
-                          >
-                            {editMode && <GripVertical className="w-4 h-4 text-green-400" />}
-                            <h3 className="font-bold text-sm text-green-700">Q{period.period}</h3>
-                          </div>
+                        <ChevronLeft className="w-4 h-4 text-green-600" />
+                      </button>
+                    )}
+                    <h3 className="font-bold text-sm text-green-700 px-1">Q{period.period}</h3>
+                    {editMode && (
+                      <button
+                        onClick={() => moveQuarter(periodIndex, periodIndex + 1)}
+                        disabled={periodIndex === lineup.length - 1}
+                        className="p-1.5 rounded hover:bg-green-50 disabled:opacity-20 disabled:cursor-not-allowed touch-manipulation"
+                        aria-label="Move quarter later"
+                      >
+                        <ChevronRight className="w-4 h-4 text-green-600" />
+                      </button>
+                    )}
+                  </div>
 
                           {/* Goalie */}
                           {period.goalie && (
@@ -296,16 +294,11 @@ export default function LineupDisplay({
                               </div>
                             </div>
                           )}
-                        </CardContent>
-                      </Card>
-                    )}
-                  </Draggable>
-                );
-              })}
-              {qProvided.placeholder}
-            </div>
-          )}
-        </Droppable>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </DragDropContext>
     </div>
   );
